@@ -4,13 +4,22 @@ import {Server as PipingServer} from "piping-server";
 import * as t from "io-ts";
 import * as basicAuth from "basic-auth";
 
+import {fakeNginxResponse} from "./fake-nginx-response";
+
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 type Handler = (req: HttpReq, res: HttpRes) => void;
 
 const socketCloseRejectionType = t.literal('socket-close');
-const rejectionType = socketCloseRejectionType;
+const nginxDownRejectionType = t.union([
+  t.literal('nginx-down'),
+  t.type({
+    type: t.literal('nginx-down'),
+    nginxVersion: t.string,
+  })
+]);
+const rejectionType = t.union([socketCloseRejectionType, nginxDownRejectionType]);
 
 export const configType = t.type({
   basicAuthUsers: t.union([
@@ -54,6 +63,7 @@ function basicAuthDenied(res: HttpRes) {
   res.end("Access denied\n");
 }
 
+const defaultFakeNginxVersion = "1.17.8";
 export function generateHandler({pipingServer, config, useHttps}: {pipingServer: PipingServer, config: Config, useHttps: boolean}): Handler {
   const pipingHandler = pipingServer.generateHandler(useHttps);
   const allows = createAllows(config);
@@ -61,6 +71,11 @@ export function generateHandler({pipingServer, config, useHttps}: {pipingServer:
     if (!allows(req)) {
       if (config.rejection === 'socket-close') {
         req.socket.end();
+        return;
+      }
+      if (config.rejection === 'nginx-down' || config.rejection.type === 'nginx-down') {
+        const nginxVersion = (typeof config.rejection === "object" && "type" in config.rejection) && config.rejection.type === 'nginx-down' ? config.rejection.nginxVersion : defaultFakeNginxVersion;
+        fakeNginxResponse(res, nginxVersion, req.headers["user-agent"] ?? "");
         return;
       }
       throw Error('never reach');
