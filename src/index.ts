@@ -7,12 +7,13 @@ import * as http2 from "http2";
 import * as log4js from "log4js";
 import * as yargs from "yargs";
 import * as piping from "piping-server";
+import {Server as PipingServer} from "piping-server";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 type Handler = (req: HttpReq, res: HttpRes) => void;
 
-function generateHandler({allows, useHttps}: {useHttps: boolean, allows: (req: HttpReq) => boolean}): Handler {
+function generateHandler({pipingServer, allows, useHttps}: {pipingServer: PipingServer, useHttps: boolean, allows: (req: HttpReq) => boolean}): Handler {
   const pipingHandler = pipingServer.generateHandler(useHttps);
   return (req, res) => {
     if (!allows(req)) {
@@ -69,7 +70,7 @@ const pipingServer = new piping.Server(logger);
 
 const allows = (req: HttpReq) => req.url?.startsWith(allowPath) || false;
 
-http.createServer(generateHandler({allows, useHttps: false}))
+http.createServer(generateHandler({pipingServer, allows, useHttps: false}))
   .listen(httpPort, () => {
     logger.info(`Listen HTTP on ${httpPort}...`);
   });
@@ -84,7 +85,7 @@ if (enableHttps && httpsPort !== undefined) {
         cert: fs.readFileSync(serverCrtPath),
         allowHTTP1: true
       },
-      generateHandler({allows, useHttps: true})
+      generateHandler({pipingServer, allows, useHttps: true})
     ).listen(httpsPort, () => {
       logger.info(`Listen HTTPS on ${httpsPort}...`);
     });
