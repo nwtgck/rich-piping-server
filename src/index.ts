@@ -10,65 +10,9 @@ import * as t from "io-ts";
 import { Either } from 'fp-ts/lib/Either'
 import * as yaml from "js-yaml";
 import * as piping from "piping-server";
-import {Server as PipingServer} from "piping-server";
 
-type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
-type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
-type Handler = (req: HttpReq, res: HttpRes) => void;
+import {Config, configType, generateHandler} from "./hiddenPipingServer";
 
-function generateHandler({pipingServer, allows, useHttps, rejection}: {pipingServer: PipingServer, useHttps: boolean, allows: (req: HttpReq) => boolean, rejection: Rejection}): Handler {
-  const pipingHandler = pipingServer.generateHandler(useHttps);
-  return (req, res) => {
-    if (!allows(req)) {
-      if (rejection === 'socket-close') {
-        req.socket.end();
-        return;
-      }
-      throw Error('never reach');
-    }
-    pipingHandler(req, res);
-  };
-}
-
-const socketCloseRejectionType = t.literal('socket-close');
-const rejectionType = socketCloseRejectionType;
-type Rejection = t.TypeOf<typeof rejectionType>;
-
-const configType = t.type({
-  basicAuthUsers: t.union([
-    t.array(t.type({
-      username: t.string,
-      password: t.string,
-    })),
-    t.undefined
-  ]),
-  allowPaths: t.array(
-    t.union([
-      t.string,
-      t.type({
-        type: t.literal('regexp'),
-        regexp: t.string,
-      })
-    ])
-  ),
-  rejection: rejectionType,
-});
-
-type Config = t.TypeOf<typeof configType>;
-
-function createAllows(config: Config): (req: HttpReq) => boolean {
-  return (req) => {
-    const allowsPath: boolean = config.allowPaths.some(path => {
-      if (typeof path === "string") {
-        return req.url?.startsWith(path) ?? false;
-      }
-      // TODO: handle regexp
-      return false;
-    });
-    // TODO: handle basic auth
-    return allowsPath;
-  };
-}
 
 // Create option parser
 const parser = yargs
@@ -124,11 +68,7 @@ logger.level = "info";
 // Create a piping server
 const pipingServer = new piping.Server(logger);
 
-// Create allows
-const allows = createAllows(config);
-const rejection = config.rejection;
-
-http.createServer(generateHandler({pipingServer, allows, rejection, useHttps: false}))
+http.createServer(generateHandler({pipingServer, config, useHttps: false}))
   .listen(httpPort, () => {
     logger.info(`Listen HTTP on ${httpPort}...`);
   });
@@ -143,7 +83,7 @@ if (enableHttps && httpsPort !== undefined) {
         cert: fs.readFileSync(serverCrtPath),
         allowHTTP1: true
       },
-      generateHandler({pipingServer, allows, rejection, useHttps: true})
+      generateHandler({pipingServer, config, useHttps: true})
     ).listen(httpsPort, () => {
       logger.info(`Listen HTTPS on ${httpsPort}...`);
     });
