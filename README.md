@@ -1,6 +1,17 @@
 # hidden-piping-server
 Hidden Piping Server
 
+## Usage
+
+Run the server as follows.
+
+
+```bash
+npx nwtgck/hidden-piping-server --allow-path=/0s6twklxkrcfs1u
+```
+
+Sender and receiver can transfer over `http://localhost:8080/0s6twklxkrcfs1u/path-you-want-to-use`. If the path doesn't start with `/0s6twklxkrcfs1u`, the request is rejected.
+
 ## Options
 
 ```
