@@ -4,6 +4,9 @@
   "description": "Hidden Piping Server",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "bin": {
+    "hidden-piping-server": "dist/src/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "npm run build && node dist/src/index.js",
