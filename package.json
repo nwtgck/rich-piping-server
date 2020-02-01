@@ -1,6 +1,6 @@
 {
   "name": "hidden-piping-server",
-  "version": "0.1.0-SNAPSHOT",
+  "version": "0.1.0",
   "description": "Hidden Piping Server",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
