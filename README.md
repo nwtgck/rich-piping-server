@@ -25,6 +25,16 @@ npx nwtgck/hidden-piping-server --config-yaml-path=config.yaml
 
 Sender and receiver can transfer over `http://localhost:8080/0s6twklxkrcfs1u/path-you-want-to-use` with basic auth. If the path doesn't start with `/0s6twklxkrcfs1u`, `/aacacdb` or etc., requests is rejected.
 
+### Run on Docker
+
+Prepare `./config.yaml` and run as follows on Docker.
+
+```bash
+docker run -p 8181:8080 -v $PWD/config.yaml:/config.yaml nwtgck/hidden-piping-server --config-yaml-path=/config.yaml
+```
+
+The server runs on <http://localhost:8181>.
+
 ## Config syntax
 
 The config YAML syntax is strictly typed with [io-ts](https://github.com/gcanti/io-ts). The definition of config is as follows:  
