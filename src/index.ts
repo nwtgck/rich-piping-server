@@ -56,7 +56,10 @@ const configYamlPath: string = args["config-yaml-path"];
 const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath) as any, 'utf8' as any);
 const configEither: Either<t.Errors, Config> = configType.decode(configYaml);
 if (configEither._tag === "Left") {
-  process.stderr.write("Config error found.\n");
+  for (const v of configEither.left) {
+    if (v.value === undefined) continue;
+    process.stderr.write(`[ERROR] Invalid value: ${JSON.stringify(v.value)}\n`);
+  }
   process.exit(1);
 }
 const config: Config = configEither.right;
