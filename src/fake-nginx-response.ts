@@ -25,8 +25,10 @@ export function fakeNginxResponse(res: http.ServerResponse | http2.Http2ServerRe
       ""
     );
 
+  if ("shouldKeepAlive" in res) {
+    res.shouldKeepAlive = false;
+  }
   // TODO: set false
-  // res.shouldKeepAlive = false;
   res.writeHead(500, "Internal Server Error", {
     "Server": `nginx/${nginxVersion}`,
     "Date": new Date().toUTCString(), // (from: https://github.com/nodejs/node/blob/8b4af64f50c5e41ce0155716f294c24ccdecad03/lib/internal/http.js#L9)
