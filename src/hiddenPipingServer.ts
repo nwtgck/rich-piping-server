@@ -4,6 +4,7 @@ import {Server as PipingServer} from "piping-server";
 import * as t from "io-ts";
 import * as basicAuth from "basic-auth";
 
+import {typeAssert} from "./utils";
 import {fakeNginxResponse} from "./fake-nginx-response";
 
 
@@ -34,7 +35,7 @@ export const configType = t.type({
       t.string,
       t.type({
         type: t.literal('regexp'),
-        regexp: t.string,
+        value: t.string,
       })
     ])
   ),
@@ -43,14 +44,16 @@ export const configType = t.type({
 
 export type Config = t.TypeOf<typeof configType>;
 
+
 function createAllows(config: Config): (req: HttpReq) => boolean {
   return (req) => {
     const allowsPath: boolean = config.allowPaths.some(path => {
       if (typeof path === "string") {
         return req.url?.startsWith(path) ?? false;
       }
-      // TODO: handle regexp
-      return false;
+      typeAssert<"regexp">(path.type);
+      const r = new RegExp(path.value);
+      return req.url?.match(r) ?? false;
     });
     return allowsPath;
   };
