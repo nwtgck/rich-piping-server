@@ -11,7 +11,7 @@ import { Either } from 'fp-ts/lib/Either'
 import * as yaml from "js-yaml";
 import * as piping from "piping-server";
 
-import {Config, configType, generateHandler} from "./hiddenPipingServer";
+import {Config, configType, generateHandler} from "./hidden-piping-server";
 
 
 // Create option parser
