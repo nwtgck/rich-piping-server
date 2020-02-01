@@ -49,7 +49,7 @@ function createAllows(config: Config): (req: HttpReq) => boolean {
   return (req) => {
     const allowsPath: boolean = config.allowPaths.some(path => {
       if (typeof path === "string") {
-        return req.url?.startsWith(path) ?? false;
+        return req.url === path;
       }
       typeAssert<"regexp">(path.type);
       const r = new RegExp(path.value);
