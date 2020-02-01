@@ -51,27 +51,48 @@ const serverKeyPath: string | undefined = args["key-path"];
 const serverCrtPath: string | undefined = args["crt-path"];
 const configYamlPath: string = args["config-yaml-path"];
 
-// Load config
-// TODO: any
-const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath) as any, 'utf8' as any);
-const configEither: Either<t.Errors, Config> = configType.decode(configYaml);
-if (configEither._tag === "Left") {
-  for (const v of configEither.left) {
-    if (v.value === undefined) continue;
-    process.stderr.write(`[ERROR] Invalid value: ${JSON.stringify(v.value)}\n`);
+const configRef: {ref: Config} = {
+  ref: {
+    basicAuthUsers: undefined,
+    allowPaths: [],
+    rejection: 'socket-close',
+  },
+};
+
+function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
+  // Load config
+  logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
+  // TODO: any
+  const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath) as any, 'utf8' as any);
+  const configEither: Either<t.Errors, Config> = configType.decode(configYaml);
+  if (configEither._tag === "Left") {
+    for (const v of configEither.left) {
+      if (v.value === undefined) continue;
+      logger.error(`Invalid config value: ${JSON.stringify(v.value)}`);
+    }
+    return;
   }
-  process.exit(1);
+  // Update config
+  configRef.ref = configEither.right;
+  logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
 }
-const config: Config = configEither.right;
 
 // Create a logger
 const logger = log4js.getLogger();
 logger.level = "info";
 
+// Load config
+loadAndUpdateConfig(logger, configYamlPath);
+
+// Watch config yaml
+fs.watch(configYamlPath, () => {
+  loadAndUpdateConfig(logger, configYamlPath);
+});
+
 // Create a piping server
 const pipingServer = new piping.Server(logger);
 
-http.createServer(generateHandler({pipingServer, config, useHttps: false}))
+http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
   .listen(httpPort, () => {
     logger.info(`Listen HTTP on ${httpPort}...`);
   });
@@ -86,7 +107,7 @@ if (enableHttps && httpsPort !== undefined) {
         cert: fs.readFileSync(serverCrtPath),
         allowHTTP1: true
       },
-      generateHandler({pipingServer, config, useHttps: true})
+      generateHandler({pipingServer, configRef, useHttps: true})
     ).listen(httpsPort, () => {
       logger.info(`Listen HTTPS on ${httpsPort}...`);
     });
