@@ -6,23 +6,13 @@ import * as http from "http";
 import * as http2 from "http2";
 import * as log4js from "log4js";
 import * as yargs from "yargs";
+import * as t from "io-ts";
+import { Either } from 'fp-ts/lib/Either'
+import * as yaml from "js-yaml";
 import * as piping from "piping-server";
-import {Server as PipingServer} from "piping-server";
 
-type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
-type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
-type Handler = (req: HttpReq, res: HttpRes) => void;
+import {Config, configType, generateHandler} from "./hidden-piping-server";
 
-function generateHandler({pipingServer, allows, useHttps}: {pipingServer: PipingServer, useHttps: boolean, allows: (req: HttpReq) => boolean}): Handler {
-  const pipingHandler = pipingServer.generateHandler(useHttps);
-  return (req, res) => {
-    if (!allows(req)) {
-      req.socket.end();
-      return;
-    }
-    pipingHandler(req, res);
-  };
-}
 
 // Create option parser
 const parser = yargs
@@ -46,8 +36,8 @@ const parser = yargs
     describe: "Certification path",
     type: "string"
   })
-  .option('allow-path', {
-    describe: "Allow HTTP path",
+  .option('config-yaml-path', {
+    describe: "Config YAML path",
     type: "string",
     required: true,
   });
@@ -59,18 +49,50 @@ const enableHttps: boolean = args["enable-https"];
 const httpsPort: number | undefined = args["https-port"];
 const serverKeyPath: string | undefined = args["key-path"];
 const serverCrtPath: string | undefined = args["crt-path"];
-const allowPath: string = args["allow-path"];
+const configYamlPath: string = args["config-yaml-path"];
+
+const configRef: {ref: Config} = {
+  ref: {
+    basicAuthUsers: undefined,
+    allowPaths: [],
+    rejection: 'socket-close',
+  },
+};
+
+function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
+  // Load config
+  logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
+  // TODO: any
+  const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath) as any, 'utf8' as any);
+  const configEither: Either<t.Errors, Config> = configType.decode(configYaml);
+  if (configEither._tag === "Left") {
+    for (const v of configEither.left) {
+      if (v.value === undefined) continue;
+      logger.error(`Invalid config value: ${JSON.stringify(v.value)}`);
+    }
+    return;
+  }
+  // Update config
+  configRef.ref = configEither.right;
+  logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
+}
 
 // Create a logger
 const logger = log4js.getLogger();
 logger.level = "info";
 
+// Load config
+loadAndUpdateConfig(logger, configYamlPath);
+
+// Watch config yaml
+fs.watch(configYamlPath, () => {
+  loadAndUpdateConfig(logger, configYamlPath);
+});
+
 // Create a piping server
 const pipingServer = new piping.Server(logger);
 
-const allows = (req: HttpReq) => req.url?.startsWith(allowPath) || false;
-
-http.createServer(generateHandler({pipingServer, allows, useHttps: false}))
+http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
   .listen(httpPort, () => {
     logger.info(`Listen HTTP on ${httpPort}...`);
   });
@@ -85,7 +107,7 @@ if (enableHttps && httpsPort !== undefined) {
         cert: fs.readFileSync(serverCrtPath),
         allowHTTP1: true
       },
-      generateHandler({pipingServer, allows, useHttps: true})
+      generateHandler({pipingServer, configRef, useHttps: true})
     ).listen(httpsPort, () => {
       logger.info(`Listen HTTPS on ${httpsPort}...`);
     });
