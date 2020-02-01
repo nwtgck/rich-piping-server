@@ -17,7 +17,7 @@ basicAuthUsers:
 rejection: nginx-down
 ```
 
-Run the server as follows.
+Run the server as follows. The config is hot-reloaded.
 
 ```bash
 npx nwtgck/hidden-piping-server --config-yaml-path=config.yaml
