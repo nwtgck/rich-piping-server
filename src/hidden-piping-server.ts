@@ -86,8 +86,7 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
     }
     // Basic auth is enabled
     if (config.basicAuthUsers !== undefined) {
-      // TODO: this type assertion may not be safe. confirm later
-      const user = basicAuth(req as http.IncomingMessage);
+      const user = basicAuth(req);
       if (user === undefined) {
         basicAuthDenied(res);
         return;
