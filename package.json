@@ -44,6 +44,6 @@
     "ts-node": "^8.6.2",
     "typescript": "^3.7.5",
     "useragent": "^2.3.0",
-    "yargs": "^15.1.0"
+    "yargs": "^15.2.0"
   }
 }
