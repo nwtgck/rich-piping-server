@@ -37,7 +37,7 @@
     "fp-ts": "^2.4.4",
     "io-ts": "^2.0.6",
     "js-yaml": "^3.13.1",
-    "log4js": "^6.1.1",
+    "log4js": "^6.1.2",
     "mocha": "^7.0.1",
     "piping-server": "^1.0.0",
     "power-assert": "^1.6.1",
