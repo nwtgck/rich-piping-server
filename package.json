@@ -41,7 +41,7 @@
     "mocha": "^7.0.1",
     "piping-server": "^1.0.0",
     "power-assert": "^1.6.1",
-    "ts-node": "^8.6.2",
+    "ts-node": "^8.8.1",
     "typescript": "^3.7.5",
     "useragent": "^2.3.0",
     "yargs": "^15.1.0"
