@@ -23,7 +23,17 @@ Run the server as follows. The config is hot-reloaded.
 npx nwtgck/hidden-piping-server --config-yaml-path=config.yaml
 ```
 
-Sender and receiver can transfer over `http://localhost:8080/0s6twklxkrcfs1u/path-you-want-to-use` with basic auth. If the path doesn't start with `/0s6twklxkrcfs1u`, `/aacacdb` or etc., requests is rejected.
+Sender and receiver can transfer over `http://localhost:8080/0s6twklxkrcfs1u` or `http://localhost:8080/aacacdb/path-you-want-to-use` with basic auth. If the path is not `/0s6twklxkrcfs1u`, not starting with `/aacacdb` or etc., requests are rejected.
+
+### Run on Docker
+
+Prepare `./config.yaml` and run as follows on Docker.
+
+```bash
+docker run -p 8181:8080 -v $PWD/config.yaml:/config.yaml nwtgck/hidden-piping-server --config-yaml-path=/config.yaml
+```
+
+The server runs on <http://localhost:8181>.
 
 ## Config syntax
 

@@ -62,8 +62,7 @@ const configRef: {ref: Config} = {
 function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
-  // TODO: any
-  const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath) as any, 'utf8' as any);
+  const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath, 'utf8'));
   const configEither: Either<t.Errors, Config> = configType.decode(configYaml);
   if (configEither._tag === "Left") {
     for (const v of configEither.left) {
