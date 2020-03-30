@@ -38,7 +38,7 @@
     "io-ts": "^2.0.6",
     "js-yaml": "^3.13.1",
     "log4js": "^6.1.1",
-    "mocha": "^7.0.1",
+    "mocha": "^7.1.1",
     "piping-server": "^1.0.0",
     "power-assert": "^1.6.1",
     "ts-node": "^8.6.2",
