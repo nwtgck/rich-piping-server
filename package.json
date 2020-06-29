@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "basic-auth": "^2.0.1",
-    "fp-ts": "^2.5.3",
+    "fp-ts": "^2.6.7",
     "io-ts": "^2.1.2",
     "js-yaml": "^3.13.1",
     "log4js": "^6.1.2",
