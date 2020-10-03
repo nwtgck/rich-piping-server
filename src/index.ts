@@ -89,7 +89,7 @@ fs.watch(configYamlPath, () => {
 });
 
 // Create a piping server
-const pipingServer = new piping.Server(logger);
+const pipingServer = new piping.Server({logger});
 
 http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
   .listen(httpPort, () => {
