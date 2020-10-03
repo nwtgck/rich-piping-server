@@ -1,4 +1,6 @@
 # rich-piping-server
+![Node CI](https://github.com/nwtgck/rich-piping-server/workflows/Node%20CI/badge.svg)
+
 Rich [Piping Server](https://github.com/nwtgck/piping-server)
 
 ## Usage
