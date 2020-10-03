@@ -11,7 +11,7 @@ import { Either } from 'fp-ts/lib/Either'
 import * as yaml from "js-yaml";
 import * as piping from "piping-server";
 
-import {Config, configType, generateHandler} from "./hidden-piping-server";
+import {Config, configType, generateHandler} from "./rich-piping-server";
 
 
 // Create option parser
@@ -89,7 +89,7 @@ fs.watch(configYamlPath, () => {
 });
 
 // Create a piping server
-const pipingServer = new piping.Server(logger);
+const pipingServer = new piping.Server({logger});
 
 http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
   .listen(httpPort, () => {
