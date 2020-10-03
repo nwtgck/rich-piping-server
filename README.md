@@ -40,7 +40,7 @@ The server runs on <http://localhost:8181>.
 ## Config syntax
 
 The config YAML syntax is strictly typed with [io-ts](https://github.com/gcanti/io-ts). The definition of config is as follows:  
-<https://github.com/nwtgck/rich-piping-server/blob/45ce65177e2cdcc2f6d0513e964e84aa78504a70/src/rich-piping-server.ts#L15-L45>
+<https://github.com/nwtgck/rich-piping-server/blob/005cf373032967b91a6166c19857c29450ba9419/src/rich-piping-server.ts#L15-L45>
 
 You can see other parameters and what fields are optional.
 
