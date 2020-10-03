@@ -1,11 +1,11 @@
 {
-  "name": "hidden-piping-server",
+  "name": "rich-piping-server",
   "version": "0.1.1",
-  "description": "Hidden Piping Server",
+  "description": "Rich Piping Server",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "hidden-piping-server": "dist/src/index.js"
+    "rich-piping-server": "dist/src/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -18,7 +18,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nwtgck/hidden-piping-server"
+    "url": "https://github.com/nwtgck/rich-piping-server"
   },
   "author": "Ryo Ota <nwtgck@nwtgck.org> (https://github.com/nwtgck)",
   "license": "MIT",
