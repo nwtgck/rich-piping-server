@@ -43,6 +43,6 @@
     "log4js": "^6.3.0",
     "piping-server": "^1.2.0",
     "useragent": "^2.3.0",
-    "yargs": "^16.0.3"
+    "yargs": "^16.2.0"
   }
 }
