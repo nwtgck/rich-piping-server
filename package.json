@@ -28,7 +28,7 @@
     "@types/mocha": "^8.2.0",
     "@types/node": "^12.12.62",
     "@types/power-assert": "^1.5.3",
-    "@types/useragent": "^2.1.1",
+    "@types/useragent": "^2.3.0",
     "@types/yargs": "^15.0.7",
     "mocha": "^7.1.1",
     "power-assert": "^1.6.1",
