@@ -41,7 +41,7 @@
     "io-ts": "^2.2.10",
     "js-yaml": "^3.14.0",
     "log4js": "^6.3.0",
-    "piping-server": "^1.2.0",
+    "piping-server": "^1.5.0",
     "useragent": "^2.3.0",
     "yargs": "^16.0.3"
   }
