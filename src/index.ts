@@ -51,13 +51,7 @@ const serverKeyPath: string | undefined = args["key-path"];
 const serverCrtPath: string | undefined = args["crt-path"];
 const configYamlPath: string = args["config-yaml-path"];
 
-const configRef: {ref: Config} = {
-  ref: {
-    basicAuthUsers: undefined,
-    allowPaths: [],
-    rejection: 'socket-close',
-  },
-};
+const configRef: {ref?: Config} = { };
 
 function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
   // Load config
