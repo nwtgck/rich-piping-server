@@ -2,13 +2,13 @@ import * as assert from "power-assert";
 import * as http from "http";
 import {closePromise, readConfig, servePromise} from "./test-utils";
 import thenRequest from "then-request";
-import {Config} from "../src/rich-piping-server";
+import {ConfigWithoutVersion} from "../src/config/without-version";
 
 describe("Rich Piping Server", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
-  let configRef: { ref?: Config } = { };
+  let configRef: { ref?: ConfigWithoutVersion } = { };
 
   beforeEach(async () => {
     const serve = await servePromise();

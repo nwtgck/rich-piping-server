@@ -10,7 +10,8 @@ import { z } from "zod";
 import * as yaml from "js-yaml";
 import * as piping from "piping-server";
 
-import {Config, configSchema, generateHandler} from "./rich-piping-server";
+import {generateHandler} from "./rich-piping-server";
+import {configWihtoutVersionSchema, ConfigWithoutVersion} from "./config/without-version";
 
 
 // Create option parser
@@ -50,7 +51,7 @@ const serverKeyPath: string | undefined = args["key-path"];
 const serverCrtPath: string | undefined = args["crt-path"];
 const configYamlPath: string = args["config-yaml-path"];
 
-const configRef: {ref?: Config} = { };
+const configRef: {ref?: ConfigWithoutVersion} = { };
 
 function formatZodErrorPath(path: (string | number)[]): string {
   return `${path[0]}${path.splice(1).map(p => `[${JSON.stringify(p)}]`).join("")}`;
@@ -73,7 +74,7 @@ function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
   try {
     const configYaml = yaml.load(fs.readFileSync(configYamlPath, 'utf8'));
-    const configParsed = configSchema.safeParse(configYaml);
+    const configParsed = configWihtoutVersionSchema.safeParse(configYaml);
     if (!configParsed.success) {
       logZodError(configParsed.error);
       return;
