@@ -5,7 +5,8 @@ import * as piping from "piping-server";
 import * as richPipingServer from "../src/rich-piping-server";
 import * as log4js from "log4js";
 import * as yaml from "js-yaml";
-import {Config, configSchema} from "../src/rich-piping-server";
+import {configWihtoutVersionSchema} from "../src/config/without-version";
+import {ConfigV1, configV1Schema, migrateToConfigV1} from "../src/config/v1";
 
 /**
  * Listen on the specified port
@@ -28,7 +29,7 @@ export function closePromise(server: http.Server | http2.Http2Server): Promise<v
   });
 }
 
-export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: string, richPipingServerHttpServer: http.Server, configRef: { ref: Config | undefined } }> {
+export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: string, richPipingServerHttpServer: http.Server, configRef: { ref?: ConfigV1 | undefined } }> {
   // Create a logger
   const logger = log4js.getLogger();
   // Get available port
@@ -37,7 +38,7 @@ export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: s
   const pipingUrl = `http://localhost:${pipingPort}`;
   // Create a Piping server
   const pipingServer = new piping.Server({logger});
-  const configRef: { ref: Config | undefined } = { ref: undefined };
+  const configRef: { ref?: ConfigV1 | undefined } = { };
   const richPipingServerHttpServer = http.createServer(richPipingServer.generateHandler({
     pipingServer,
     configRef,
@@ -54,7 +55,13 @@ export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: s
   };
 }
 
-export function readConfig(yamlString: string): Config {
+export function readConfigWithoutVersionAndMigrateToV1(yamlString: string): ConfigV1 {
   const configYaml = yaml.load(yamlString);
-  return configSchema.parse(configYaml);
+  const configWithoutVersion = configWihtoutVersionSchema.parse(configYaml);
+  return migrateToConfigV1(configWithoutVersion);
+}
+
+export function readConfigV1(yamlString: string): ConfigV1 {
+  const configYaml = yaml.load(yamlString);
+  return configV1Schema.parse(configYaml);
 }

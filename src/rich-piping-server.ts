@@ -1,52 +1,20 @@
 import * as http from "http";
 import * as http2 from "http2";
 import {Server as PipingServer} from "piping-server";
-import { z } from "zod";
 import * as basicAuth from "basic-auth";
 
 import {typeAssert} from "./utils";
 import {fakeNginxResponse} from "./fake-nginx-response";
+import {ConfigV1} from "./config/v1";
 
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 type Handler = (req: HttpReq, res: HttpRes) => void;
 
-const socketCloseRejectionSchema = z.literal('socket-close');
-const nginxDownRejectionSchema = z.union([
-  z.literal('nginx-down'),
-  z.object({
-    type: z.literal('nginx-down'),
-    nginxVersion: z.string(),
-  })
-]);
-const rejectionSchema = z.union([socketCloseRejectionSchema, nginxDownRejectionSchema]);
-
-export const configSchema = z.object({
-  basicAuthUsers: z.union([
-    z.array(z.object({
-      username: z.string(),
-      password: z.string(),
-    })),
-    z.undefined(),
-  ]),
-  allowPaths: z.array(
-    z.union([
-      z.string(),
-      z.object({
-        type: z.literal('regexp'),
-        value: z.string(),
-      })
-    ])
-  ),
-  rejection: rejectionSchema,
-});
-
-export type Config = z.infer<typeof configSchema>;
-
-function createAllows(config: Config): (req: HttpReq) => boolean {
+function createAllows(config: ConfigV1): (req: HttpReq) => boolean {
   return (req) => {
-    const allowsPath: boolean = config.allowPaths.some(path => {
+    const allowsPath: boolean = config.allow_paths.some(path => {
       if (typeof path === "string") {
         return req.url === path;
       }
@@ -66,7 +34,7 @@ function basicAuthDenied(res: HttpRes) {
 }
 
 const defaultFakeNginxVersion = "1.17.8";
-export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref?: Config | undefined}, useHttps: boolean}): Handler {
+export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref?: ConfigV1 | undefined}, useHttps: boolean}): Handler {
   const pipingHandler = pipingServer.generateHandler(useHttps);
   return (req, res) => {
     const config = configRef.ref;
@@ -76,26 +44,26 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
     }
     const allows = createAllows(config);
     if (!allows(req)) {
-      if (config.rejection === 'socket-close') {
+      if (config.rejection === 'socket_close') {
         req.socket.end();
         return;
       }
-      if (config.rejection === 'nginx-down' || config.rejection.type === 'nginx-down') {
-        const nginxVersion = (typeof config.rejection === "object" && "type" in config.rejection) && config.rejection.type === 'nginx-down' ? config.rejection.nginxVersion : defaultFakeNginxVersion;
+      if (config.rejection === 'fake_nginx_down' || config.rejection.type === 'fake_nginx_down') {
+        const nginxVersion = (typeof config.rejection === "object" && "type" in config.rejection) && config.rejection.type === 'fake_nginx_down' ? config.rejection.nginx_version : defaultFakeNginxVersion;
         fakeNginxResponse(res, nginxVersion, req.headers["user-agent"] ?? "");
         return;
       }
       throw Error('never reach');
     }
     // Basic auth is enabled
-    if (config.basicAuthUsers !== undefined) {
+    if (config.basic_auth_users !== undefined) {
       const user = basicAuth(req);
       if (user === undefined) {
         basicAuthDenied(res);
         return;
       }
       const {name, pass} = user;
-      const allowsUser = config.basicAuthUsers.some(({username, password}) =>
+      const allowsUser = config.basic_auth_users.some(({username, password}) =>
         username === name && password === pass
       );
       if (!allowsUser) {

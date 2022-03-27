@@ -10,7 +10,9 @@ import { z } from "zod";
 import * as yaml from "js-yaml";
 import * as piping from "piping-server";
 
-import {Config, configSchema, generateHandler} from "./rich-piping-server";
+import {generateHandler} from "./rich-piping-server";
+import {configWihtoutVersionSchema} from "./config/without-version";
+import {ConfigV1, configV1Schema, migrateToConfigV1} from "./config/v1";
 
 
 // Create option parser
@@ -50,7 +52,7 @@ const serverKeyPath: string | undefined = args["key-path"];
 const serverCrtPath: string | undefined = args["crt-path"];
 const configYamlPath: string = args["config-yaml-path"];
 
-const configRef: {ref?: Config} = { };
+const configRef: {ref?: ConfigV1} = { };
 
 function formatZodErrorPath(path: (string | number)[]): string {
   return `${path[0]}${path.splice(1).map(p => `[${JSON.stringify(p)}]`).join("")}`;
@@ -68,6 +70,10 @@ function logZodError<T>(zodError: z.ZodError<T>) {
   }
 }
 
+const configSchema = z.union([
+  configWihtoutVersionSchema,
+  configV1Schema,
+]);
 function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
@@ -79,7 +85,12 @@ function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void
       return;
     }
     // Update config
-    configRef.ref = configParsed.data;
+    if ("version" in configParsed.data) {
+      configRef.ref = configParsed.data;
+    } else {
+      logger.warn("config format is old");
+      configRef.ref = migrateToConfigV1(configParsed.data);
+    }
     logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
   } catch (err) {
     logger.error("Failed to load config", err);

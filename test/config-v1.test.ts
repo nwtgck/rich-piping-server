@@ -1,10 +1,10 @@
 import * as assert from "power-assert";
 import * as http from "http";
-import {closePromise, readConfigWithoutVersionAndMigrateToV1, servePromise} from "./test-utils";
+import {closePromise, readConfigV1, servePromise} from "./test-utils";
 import thenRequest from "then-request";
 import {ConfigV1} from "../src/config/v1";
 
-describe("Rich Piping Server", () => {
+describe("Rich Piping Server (config v1)", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
@@ -58,21 +58,27 @@ describe("Rich Piping Server", () => {
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-allowPaths:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
   - type: regexp
-    value: "/.*"
-rejection: socket-close
+    value: ".*"
+rejection: socket_close
 `);
     await shouldTransfer({path: "/mypath1"});
   });
 
   it("should transfer at only allowed path", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-allowPaths:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
   - /myallowedpath1
-rejection: socket-close
+rejection: socket_close
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
@@ -80,10 +86,13 @@ rejection: socket-close
 
   it("should reject with Nginx error page", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-allowPaths:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
   - /myallowedpath1
-rejection: nginx-down
+rejection: fake_nginx_down
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
@@ -94,13 +103,16 @@ rejection: nginx-down
 
   it("should transfer with basic auth", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-basicAuthUsers:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+basic_auth_users:
   - username: user1
     password: pass1234
-allowPaths:
+allow_paths:
   - /myallowedpath1
-rejection: socket-close
+rejection: socket_close
 `);
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
     await shouldTransfer({
