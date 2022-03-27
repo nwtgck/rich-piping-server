@@ -74,4 +74,6 @@ rejection: socket-close
     await shouldTransfer({path: "/myallowedpath1" });
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
   });
+
+  // TODO: add more tests
 });
