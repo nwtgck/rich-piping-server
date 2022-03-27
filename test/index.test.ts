@@ -49,7 +49,7 @@ describe("Rich Piping Server", () => {
     try {
       await shouldTransfer({path: params.path});
       throw new Error("should not transfer");
-    } catch (err) {
+    } catch (err: any) {
       if (err.code !== "ECONNRESET") {
         throw new Error("code is not 'ECONNRESET'");
       }
