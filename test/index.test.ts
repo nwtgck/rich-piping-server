@@ -23,19 +23,12 @@ describe("Rich Piping Server", () => {
     await closePromise(richPipingServerHttpServer);
   });
 
-  it("should transfer", async () => {
-    // language=yaml
-    configRef.ref = readConfig(`
-allowPaths:
-  - type: regexp
-    value: "/.*"
-rejection: socket-close
-`);
+  async function shouldTransfer(params: { path: string }) {
     // Get request promise
-    const resPromise = thenRequest("GET", `${pipingUrl}/mydataid`);
+    const resPromise = thenRequest("GET", `${pipingUrl}${params.path}`);
 
     // Send data
-    await thenRequest("POST", `${pipingUrl}/mydataid`, {
+    await thenRequest("POST", `${pipingUrl}${params.path}`, {
       body: "this is a content"
     });
 
@@ -47,5 +40,38 @@ rejection: socket-close
     // Content-length should be returned
     assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
     assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
+  }
+
+  async function shouldNotTransferAndSocketClosed(params: { path: string }) {
+    try {
+      await shouldTransfer({path: params.path});
+      throw new Error("should not transfer");
+    } catch (err) {
+      if (err.code !== "ECONNRESET") {
+        throw new Error("code is not 'ECONNRESET'");
+      }
+    }
+  }
+
+  it("should transfer when all path allowed", async () => {
+    // language=yaml
+    configRef.ref = readConfig(`
+allowPaths:
+  - type: regexp
+    value: "/.*"
+rejection: socket-close
+`);
+    await shouldTransfer({path: "/mypath1"});
+  });
+
+  it("should transfer at only allowed path", async () => {
+    // language=yaml
+    configRef.ref = readConfig(`
+allowPaths:
+  - /myallowedpath1
+rejection: socket-close
+`);
+    await shouldTransfer({path: "/myallowedpath1" });
+    await shouldNotTransferAndSocketClosed({path: "/mypath1"});
   });
 });
