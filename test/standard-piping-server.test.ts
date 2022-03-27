@@ -2,25 +2,35 @@ import * as assert from "power-assert";
 import * as http from "http";
 import {closePromise, servePromise} from "./test-utils";
 import thenRequest from "then-request";
+import {Config} from "../dist/src/rich-piping-server";
 
 describe("standard Piping Server", () => {
-  let pipingServer!: http.Server;
-  let pipingPort!: number;
+  let richPipingServerHttpServer: http.Server;
+  let pipingPort: number;
   let pipingUrl: string;
+  let configRef: { ref?: Config } = { };
 
   beforeEach(async () => {
     const serve = await servePromise();
-    pipingServer = serve.pipingServer;
+    richPipingServerHttpServer = serve.richPipingServerHttpServer;
     pipingPort = serve.pipingPort;
     pipingUrl = serve.pipingUrl;
+    configRef = serve.configRef;
   });
 
   afterEach(async () => {
     // Close the piping server
-    await closePromise(pipingServer);
+    await closePromise(richPipingServerHttpServer);
   });
 
   it("should transfer", async () => {
+    configRef.ref = {
+      basicAuthUsers: undefined,
+      allowPaths: [
+        { type: "regexp", value: "/.*" },
+      ],
+      rejection: "socket-close",
+    };
     // Get request promise
     const resPromise = thenRequest("GET", `${pipingUrl}/mydataid`);
 
