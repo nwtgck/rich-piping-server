@@ -18,8 +18,7 @@ function createAllows(config: ConfigV1): (req: HttpReq) => boolean {
       if (typeof path === "string") {
         return req.url === path;
       }
-      typeAssert<"regexp">(path.type);
-      const r = new RegExp(path.value);
+      const r = new RegExp(path.regexp);
       return req.url?.match(r) ?? false;
     });
     return allowsPath;

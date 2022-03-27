@@ -63,8 +63,7 @@ version: "1"
 config_for: rich_piping_server
 
 allow_paths:
-  - type: regexp
-    value: ".*"
+  - regexp: ".*"
 rejection: socket_close
 `);
     await shouldTransfer({path: "/mypath1"});

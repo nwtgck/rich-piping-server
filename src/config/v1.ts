@@ -18,8 +18,7 @@ export const configV1Schema = z.object({
     z.union([
       z.string(),
       z.object({
-        type: z.literal("regexp"),
-        value: z.string(),
+        regexp: z.string(),
       }),
     ]),
   ),
@@ -49,7 +48,7 @@ export function migrateToConfigV1(c: ConfigWithoutVersion): ConfigV1 {
       if (typeof p === "string") {
         return p;
       }
-      return p;
+      return { regexp: p.value };
     }),
     rejection: (() => {
       if (c.rejection === "socket-close") {
