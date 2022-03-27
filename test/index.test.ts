@@ -2,7 +2,7 @@ import * as assert from "power-assert";
 import * as http from "http";
 import {closePromise, readConfig, servePromise} from "./test-utils";
 import thenRequest from "then-request";
-import {Config} from "../dist/src/rich-piping-server";
+import {Config} from "../src/rich-piping-server";
 
 describe("Rich Piping Server", () => {
   let richPipingServerHttpServer: http.Server;
