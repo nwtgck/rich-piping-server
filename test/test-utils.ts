@@ -4,9 +4,8 @@ import * as getPort from "get-port";
 import * as piping from "piping-server";
 import * as richPipingServer from "../src/rich-piping-server";
 import * as log4js from "log4js";
-import * as t from "io-ts";
 import * as yaml from "js-yaml";
-import {Config, configType} from "../src/rich-piping-server";
+import {Config, configSchema} from "../src/rich-piping-server";
 
 /**
  * Listen on the specified port
@@ -57,9 +56,5 @@ export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: s
 
 export function readConfig(yamlString: string): Config {
   const configYaml = yaml.safeLoad(yamlString);
-  const configEither = configType.decode(configYaml);
-  if (configEither._tag === "Left") {
-    throw configEither.left;
-  }
-  return configEither.right;
+  return configSchema.parse(configYaml);
 }

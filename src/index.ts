@@ -6,12 +6,11 @@ import * as http from "http";
 import * as http2 from "http2";
 import * as log4js from "log4js";
 import * as yargs from "yargs";
-import * as t from "io-ts";
-import { Either } from 'fp-ts/lib/Either'
+import { z } from "zod";
 import * as yaml from "js-yaml";
 import * as piping from "piping-server";
 
-import {Config, configType, generateHandler} from "./rich-piping-server";
+import {Config, configSchema, generateHandler} from "./rich-piping-server";
 
 
 // Create option parser
@@ -53,20 +52,33 @@ const configYamlPath: string = args["config-yaml-path"];
 
 const configRef: {ref?: Config} = { };
 
+function formatZodErrorPath(path: (string | number)[]): string {
+  return `${path[0]}${path.splice(1).map(p => `[${JSON.stringify(p)}]`).join("")}`;
+}
+
+function logZodError<T>(zodError: z.ZodError<T>) {
+  for (const issue of zodError.issues) {
+    if (issue.code === "invalid_union") {
+      for (const e of issue.unionErrors) {
+        logZodError(e);
+      }
+      continue;
+    }
+    logger.error(`Config load error: ${formatZodErrorPath(issue.path)}: ${issue.message}`);
+  }
+}
+
 function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
   const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath, 'utf8'));
-  const configEither: Either<t.Errors, Config> = configType.decode(configYaml);
-  if (configEither._tag === "Left") {
-    for (const v of configEither.left) {
-      if (v.value === undefined) continue;
-      logger.error(`Invalid config value: ${JSON.stringify(v.value)}`);
-    }
+  const configParsed = configSchema.safeParse(configYaml);
+  if (!configParsed.success) {
+    logZodError(configParsed.error);
     return;
   }
   // Update config
-  configRef.ref = configEither.right;
+  configRef.ref = configParsed.data;
   logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
 }
 

@@ -1,7 +1,7 @@
 import * as http from "http";
 import * as http2 from "http2";
 import {Server as PipingServer} from "piping-server";
-import * as t from "io-ts";
+import { z } from "zod";
 import * as basicAuth from "basic-auth";
 
 import {typeAssert} from "./utils";
@@ -12,38 +12,37 @@ type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 type Handler = (req: HttpReq, res: HttpRes) => void;
 
-const socketCloseRejectionType = t.literal('socket-close');
-const nginxDownRejectionType = t.union([
-  t.literal('nginx-down'),
-  t.type({
-    type: t.literal('nginx-down'),
-    nginxVersion: t.string,
+const socketCloseRejectionSchema = z.literal('socket-close');
+const nginxDownRejectionSchema = z.union([
+  z.literal('nginx-down'),
+  z.object({
+    type: z.literal('nginx-down'),
+    nginxVersion: z.string(),
   })
 ]);
-const rejectionType = t.union([socketCloseRejectionType, nginxDownRejectionType]);
+const rejectionSchema = z.union([socketCloseRejectionSchema, nginxDownRejectionSchema]);
 
-export const configType = t.type({
-  basicAuthUsers: t.union([
-    t.array(t.type({
-      username: t.string,
-      password: t.string,
+export const configSchema = z.object({
+  basicAuthUsers: z.union([
+    z.array(z.object({
+      username: z.string(),
+      password: z.string(),
     })),
-    t.undefined
+    z.undefined(),
   ]),
-  allowPaths: t.array(
-    t.union([
-      t.string,
-      t.type({
-        type: t.literal('regexp'),
-        value: t.string,
+  allowPaths: z.array(
+    z.union([
+      z.string(),
+      z.object({
+        type: z.literal('regexp'),
+        value: z.string(),
       })
     ])
   ),
-  rejection: rejectionType,
+  rejection: rejectionSchema,
 });
 
-export type Config = t.TypeOf<typeof configType>;
-
+export type Config = z.infer<typeof configSchema>;
 
 function createAllows(config: Config): (req: HttpReq) => boolean {
   return (req) => {
