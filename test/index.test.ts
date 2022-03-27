@@ -4,7 +4,7 @@ import {closePromise, servePromise} from "./test-utils";
 import thenRequest from "then-request";
 import {Config} from "../dist/src/rich-piping-server";
 
-describe("standard Piping Server", () => {
+describe("Rich Piping Server", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
