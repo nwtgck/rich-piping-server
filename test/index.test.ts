@@ -92,6 +92,22 @@ rejection: nginx-down
     assert.strictEqual(res.headers.server, "nginx/1.17.8");
   });
 
+  it("should reject with Nginx error page with Nginx version", async () => {
+    // language=yaml
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+allowPaths:
+  - /myallowedpath1
+rejection:
+  type: nginx-down
+  nginxVersion: 99.9.9
+`);
+    await shouldTransfer({path: "/myallowedpath1" });
+    // Get request promise
+    const res = await thenRequest("GET", `${pipingUrl}/mypath1`);
+    assert.strictEqual(res.statusCode, 500);
+    assert.strictEqual(res.headers.server, "nginx/99.9.9");
+  });
+
   it("should transfer with basic auth", async () => {
     // language=yaml
     configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
