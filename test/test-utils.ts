@@ -5,8 +5,8 @@ import * as piping from "piping-server";
 import * as richPipingServer from "../src/rich-piping-server";
 import * as log4js from "log4js";
 import * as yaml from "js-yaml";
-import {configWihtoutVersionSchema, ConfigWithoutVersion} from "../src/config/without-version";
-import {ConfigV1, migrateToConfigV1} from "../src/config/v1";
+import {configWihtoutVersionSchema} from "../src/config/without-version";
+import {ConfigV1, configV1Schema, migrateToConfigV1} from "../src/config/v1";
 
 /**
  * Listen on the specified port
@@ -59,4 +59,9 @@ export function readConfigWithoutVersionAndMigrateToV1(yamlString: string): Conf
   const configYaml = yaml.load(yamlString);
   const configWithoutVersion = configWihtoutVersionSchema.parse(configYaml);
   return migrateToConfigV1(configWithoutVersion);
+}
+
+export function readConfigV1(yamlString: string): ConfigV1 {
+  const configYaml = yaml.load(yamlString);
+  return configV1Schema.parse(configYaml);
 }
