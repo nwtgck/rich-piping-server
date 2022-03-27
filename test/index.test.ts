@@ -1,6 +1,6 @@
 import * as assert from "power-assert";
 import * as http from "http";
-import {closePromise, servePromise} from "./test-utils";
+import {closePromise, readConfig, servePromise} from "./test-utils";
 import thenRequest from "then-request";
 import {Config} from "../dist/src/rich-piping-server";
 
@@ -24,13 +24,13 @@ describe("Rich Piping Server", () => {
   });
 
   it("should transfer", async () => {
-    configRef.ref = {
-      basicAuthUsers: undefined,
-      allowPaths: [
-        { type: "regexp", value: "/.*" },
-      ],
-      rejection: "socket-close",
-    };
+    // language=yaml
+    configRef.ref = readConfig(`
+allowPaths:
+  - type: regexp
+    value: "/.*"
+rejection: socket-close
+`);
     // Get request promise
     const resPromise = thenRequest("GET", `${pipingUrl}/mydataid`);
 
