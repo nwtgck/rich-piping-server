@@ -23,13 +23,16 @@ describe("Rich Piping Server", () => {
     await closePromise(richPipingServerHttpServer);
   });
 
-  async function shouldTransfer(params: { path: string }) {
+  async function shouldTransfer(params: { path: string, headers?: http.IncomingHttpHeaders }) {
     // Get request promise
-    const resPromise = thenRequest("GET", `${pipingUrl}${params.path}`);
+    const resPromise = thenRequest("GET", `${pipingUrl}${params.path}`, {
+      headers: params.headers,
+    });
 
     // Send data
     await thenRequest("POST", `${pipingUrl}${params.path}`, {
-      body: "this is a content"
+      headers: params.headers,
+      body: "this is a content",
     });
 
     // Wait for response
@@ -75,5 +78,36 @@ rejection: socket-close
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
   });
 
-  // TODO: add more tests
+  it("should reject with Nginx error page", async () => {
+    // language=yaml
+    configRef.ref = readConfig(`
+allowPaths:
+  - /myallowedpath1
+rejection: nginx-down
+`);
+    await shouldTransfer({path: "/myallowedpath1" });
+    // Get request promise
+    const res = await thenRequest("GET", `${pipingUrl}/mypath1`);
+    assert.strictEqual(res.statusCode, 500);
+    assert.strictEqual(res.headers.server, "nginx/1.17.8");
+  });
+
+  it("should transfer with basic auth", async () => {
+    // language=yaml
+    configRef.ref = readConfig(`
+basicAuthUsers:
+  - username: user1
+    password: pass1234
+allowPaths:
+  - /myallowedpath1
+rejection: socket-close
+`);
+    await shouldNotTransferAndSocketClosed({path: "/mypath1"});
+    await shouldTransfer({
+      path: "/myallowedpath1",
+      headers: {
+        "Authorization": `Basic ${Buffer.from("user1:pass1234").toString("base64")}`,
+      },
+    });
+  });
 });
