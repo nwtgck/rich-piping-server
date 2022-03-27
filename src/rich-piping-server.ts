@@ -67,10 +67,14 @@ function basicAuthDenied(res: HttpRes) {
 }
 
 const defaultFakeNginxVersion = "1.17.8";
-export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref: Config}, useHttps: boolean}): Handler {
+export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref: Config | undefined}, useHttps: boolean}): Handler {
   const pipingHandler = pipingServer.generateHandler(useHttps);
   return (req, res) => {
     const config = configRef.ref;
+    if (config === undefined) {
+      req.socket.end();
+      return;
+    }
     const allows = createAllows(config);
     if (!allows(req)) {
       if (config.rejection === 'socket-close') {
