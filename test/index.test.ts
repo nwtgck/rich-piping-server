@@ -1,14 +1,14 @@
 import * as assert from "power-assert";
 import * as http from "http";
-import {closePromise, readConfig, servePromise} from "./test-utils";
+import {closePromise, readConfigWithoutVersionAndMigrateToV1, servePromise} from "./test-utils";
 import thenRequest from "then-request";
-import {ConfigWithoutVersion} from "../src/config/without-version";
+import {ConfigV1} from "../src/config/v1";
 
 describe("Rich Piping Server", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
-  let configRef: { ref?: ConfigWithoutVersion } = { };
+  let configRef: { ref?: ConfigV1 } = { };
 
   beforeEach(async () => {
     const serve = await servePromise();
@@ -58,7 +58,7 @@ describe("Rich Piping Server", () => {
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
-    configRef.ref = readConfig(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
 allowPaths:
   - type: regexp
     value: "/.*"
@@ -69,7 +69,7 @@ rejection: socket-close
 
   it("should transfer at only allowed path", async () => {
     // language=yaml
-    configRef.ref = readConfig(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
 allowPaths:
   - /myallowedpath1
 rejection: socket-close
@@ -80,7 +80,7 @@ rejection: socket-close
 
   it("should reject with Nginx error page", async () => {
     // language=yaml
-    configRef.ref = readConfig(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
 allowPaths:
   - /myallowedpath1
 rejection: nginx-down
@@ -94,7 +94,7 @@ rejection: nginx-down
 
   it("should transfer with basic auth", async () => {
     // language=yaml
-    configRef.ref = readConfig(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
 basicAuthUsers:
   - username: user1
     password: pass1234
