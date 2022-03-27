@@ -55,6 +55,6 @@ export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: s
 }
 
 export function readConfig(yamlString: string): Config {
-  const configYaml = yaml.safeLoad(yamlString);
+  const configYaml = yaml.load(yamlString);
   return configSchema.parse(configYaml);
 }

@@ -71,15 +71,19 @@ function logZodError<T>(zodError: z.ZodError<T>) {
 function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
-  const configYaml = yaml.safeLoad(fs.readFileSync(configYamlPath, 'utf8'));
-  const configParsed = configSchema.safeParse(configYaml);
-  if (!configParsed.success) {
-    logZodError(configParsed.error);
-    return;
+  try {
+    const configYaml = yaml.load(fs.readFileSync(configYamlPath, 'utf8'));
+    const configParsed = configSchema.safeParse(configYaml);
+    if (!configParsed.success) {
+      logZodError(configParsed.error);
+      return;
+    }
+    // Update config
+    configRef.ref = configParsed.data;
+    logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
+  } catch (err) {
+    logger.error("Failed to load config", err);
   }
-  // Update config
-  configRef.ref = configParsed.data;
-  logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
 }
 
 // Create a logger
