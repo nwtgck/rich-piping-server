@@ -1,8 +1,10 @@
 import {z} from "zod";
 import {ConfigWithoutVersion} from "./without-version";
 
+export const configV1VersionSchema = z.union([z.literal("1"), z.literal(1)]);
+
 export const configV1Schema = z.object({
-  version: z.union([z.literal("1"), z.literal(1)]),
+  version: configV1VersionSchema,
   // "config_for" is for the future standard Piping Server using YAML config, but there is no plan to use YAML in the standard one.
   config_for: z.literal("rich_piping_server"),
   basic_auth_users: z.union([

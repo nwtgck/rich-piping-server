@@ -13,6 +13,7 @@ import * as piping from "piping-server";
 import {generateHandler} from "./rich-piping-server";
 import {configWihtoutVersionSchema} from "./config/without-version";
 import {ConfigV1, configV1Schema, migrateToConfigV1} from "./config/v1";
+import {configBasicSchema} from "./config/basic";
 
 
 // Create option parser
@@ -66,7 +67,7 @@ function logZodError<T>(zodError: z.ZodError<T>) {
       }
       continue;
     }
-    logger.error(`Config load error: ${formatZodErrorPath(issue.path)}: ${issue.message}`);
+    logger.error(`Config fix hint: ${formatZodErrorPath(issue.path)}: ${issue.message}`);
   }
 }
 
@@ -79,17 +80,28 @@ function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
   try {
     const configYaml = yaml.load(fs.readFileSync(configYamlPath, 'utf8'));
-    const configParsed = configSchema.safeParse(configYaml);
-    if (!configParsed.success) {
-      logZodError(configParsed.error);
+    // NOTE: using configBasicSchema makes error message better
+    const configBasicParsed = configBasicSchema.safeParse(configYaml);
+    if (!configBasicParsed.success) {
+      logZodError(configBasicParsed.error);
       return;
     }
-    // Update config
-    if ("version" in configParsed.data) {
-      configRef.ref = configParsed.data;
-    } else {
+    if (configBasicParsed.data.version === undefined) {
       logger.warn("config format is old");
-      configRef.ref = migrateToConfigV1(configParsed.data);
+      const configWithoutVersionParsed = configWihtoutVersionSchema.safeParse(configYaml);
+      if (!configWithoutVersionParsed.success) {
+        logZodError(configWithoutVersionParsed.error);
+        return;
+      }
+      configRef.ref = migrateToConfigV1(configWithoutVersionParsed.data);
+    }
+    if (configBasicParsed.data.version === "1" || configBasicParsed.data.version === 1) {
+      const configParsed = configV1Schema.safeParse(configYaml);
+      if (!configParsed.success) {
+        logZodError(configParsed.error);
+        return;
+      }
+      configRef.ref = configParsed.data;
     }
     logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
   } catch (err) {
