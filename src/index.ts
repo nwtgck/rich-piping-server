@@ -78,10 +78,6 @@ function logZodError<T>(zodError: z.ZodError<T>) {
   }
 }
 
-const configSchema = z.union([
-  configWihtoutVersionSchema,
-  configV1Schema,
-]);
 function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
