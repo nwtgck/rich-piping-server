@@ -3,7 +3,6 @@ import * as http2 from "http2";
 import {Server as PipingServer} from "piping-server";
 import * as basicAuth from "basic-auth";
 
-import {typeAssert} from "./utils";
 import {fakeNginxResponse} from "./fake-nginx-response";
 import {ConfigV1} from "./config/v1";
 
@@ -12,17 +11,29 @@ type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 type Handler = (req: HttpReq, res: HttpRes) => void;
 
-function createAllows(config: ConfigV1): (req: HttpReq) => boolean {
-  return (req) => {
-    const allowsPath: boolean = config.allow_paths.some(path => {
-      if (typeof path === "string") {
-        return req.url === path;
-      }
+type AllowPath = ConfigV1["allow_paths"][number];
+
+function normalizePath(path: string): string {
+  return path.endsWith("/") ? path : path + "/";
+}
+
+function findAllowedPath(config: ConfigV1, req: HttpReq): AllowPath | undefined {
+  const reqUrl = req.url;
+  if (reqUrl === undefined) {
+    return undefined;
+  }
+  return config.allow_paths.find(path => {
+    if (typeof path === "string") {
+      return reqUrl === path;
+    }
+    if ("regexp" in path) {
       const r = new RegExp(path.regexp);
-      return req.url?.match(r) ?? false;
-    });
-    return allowsPath;
-  };
+      return reqUrl.match(r) ?? false;
+    }
+    const reqUrlNormalized = normalizePath(reqUrl);
+    const newIndexNormalized = normalizePath(path.new_index);
+    return reqUrlNormalized.startsWith(newIndexNormalized);
+  });
 }
 
 function basicAuthDenied(res: HttpRes) {
@@ -41,8 +52,8 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
       req.socket.end();
       return;
     }
-    const allows = createAllows(config);
-    if (!allows(req)) {
+    const allowedPath = findAllowedPath(config, req);
+    if (req.url === undefined || allowedPath === undefined) {
       if (config.rejection === 'socket_close') {
         req.socket.end();
         return;
@@ -68,6 +79,15 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
       if (!allowsUser) {
         basicAuthDenied(res);
         return;
+      }
+    }
+    // Rewrite path for index
+    // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
+    if (typeof allowedPath !== "string" && "new_index" in allowedPath) {
+      if (req.url === allowedPath.new_index) {
+        req.url = "/";
+      } else {
+        req.url = req.url.substring(allowedPath.new_index.length);
       }
     }
 
