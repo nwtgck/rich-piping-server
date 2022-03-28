@@ -20,6 +20,9 @@ export const configV1Schema = z.object({
       z.object({
         regexp: z.string(),
       }),
+      z.object({
+        new_index: z.string(),
+      }),
     ]),
   ),
   rejection: z.union([
