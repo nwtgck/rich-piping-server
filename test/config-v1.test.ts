@@ -3,6 +3,7 @@ import * as http from "http";
 import {closePromise, readConfigV1, servePromise} from "./test-utils";
 import thenRequest from "then-request";
 import {ConfigV1} from "../src/config/v1";
+import * as pipingVersion from "piping-server/dist/src/version";
 
 describe("Rich Piping Server (config v1)", () => {
   let richPipingServerHttpServer: http.Server;
@@ -81,6 +82,68 @@ rejection: socket_close
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
+    await shouldNotTransferAndSocketClosed({path: "/myallowedpath1/path1"});
+  });
+
+  context("new_index", () => {
+    it("should create a new index", async () => {
+      // language=yaml
+      configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
+  - new_index: /myindex1
+rejection: socket_close
+`);
+      await shouldTransfer({path: "/myindex1/path1" });
+      // Should respond simple Web UI
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1`);
+        assert(res.getBody("UTF-8").includes("Piping"));
+      }
+      // Should respond version
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1/version`);
+        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+      }
+    });
+
+    it("should create multiple indexes", async () => {
+      // language=yaml
+      configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
+  - new_index: /myindex1
+  - new_index: /myindex2
+rejection: socket_close
+`);
+      await shouldTransfer({path: "/myindex1/path1" });
+      // Should respond simple Web UI
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1`);
+        assert(res.getBody("UTF-8").includes("Piping"));
+      }
+      // Should respond version
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1/version`);
+        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+      }
+
+      await shouldTransfer({path: "/myindex2/path1" });
+      // Should respond simple Web UI
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex2`);
+        assert(res.getBody("UTF-8").includes("Piping"));
+      }
+      // Should respond version
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex2/version`);
+        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+      }
+    });
   });
 
   it("should reject with Nginx error page", async () => {
