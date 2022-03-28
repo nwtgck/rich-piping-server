@@ -18,6 +18,10 @@ import {configBasicSchema} from "./config/basic";
 
 // Create option parser
 const parser = yargs
+  .option("host", {
+    describe: "Bind address (e.g. 127.0.0.1, ::1)",
+    type: "string",
+  })
   .option("http-port", {
     describe: "Port of HTTP server",
     default: 8080
@@ -48,6 +52,7 @@ const parser = yargs
 
 // Parse arguments
 const args = parser.parseSync(process.argv.slice(2));
+const host: string | undefined = args["host"];
 const httpPort: number = args["http-port"];
 const enableHttps: boolean = args["enable-https"];
 const httpsPort: number | undefined = args["https-port"];
@@ -127,7 +132,7 @@ fs.watch(configYamlPath, () => {
 const pipingServer = new piping.Server({logger});
 
 http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
-  .listen(httpPort, () => {
+  .listen({ host, port: httpPort }, () => {
     logger.info(`Listen HTTP on ${httpPort}...`);
   });
 
@@ -142,7 +147,7 @@ if (enableHttps && httpsPort !== undefined) {
         allowHTTP1: true
       },
       generateHandler({pipingServer, configRef, useHttps: true})
-    ).listen(httpsPort, () => {
+    ).listen({ host, port: httpsPort }, () => {
       logger.info(`Listen HTTPS on ${httpsPort}...`);
     });
   }
