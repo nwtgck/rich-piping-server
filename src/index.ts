@@ -38,11 +38,12 @@ const parser = yargs
     describe: "Certification path",
     type: "string"
   })
-  .option('config-yaml-path', {
+  .option('config-path', {
     describe: "Config YAML path",
     type: "string",
     required: true,
-  });
+  })
+  .alias("config-path", "config-yaml-path");
 
 // Parse arguments
 const args = parser.parse(process.argv);

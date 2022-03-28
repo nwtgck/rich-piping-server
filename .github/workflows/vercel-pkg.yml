@@ -112,7 +112,7 @@ jobs:
           rejection: nginx-down
           EOF
           # Run a server in background
-          ./rich-piping-server-linuxstatic-x64/rich-piping-server --http-port=8080 --config-yaml-path=./config.yaml &> ./rich-piping-server.log &
+          ./rich-piping-server-linuxstatic-x64/rich-piping-server --http-port=8080 --config-path=./config.yaml &> ./rich-piping-server.log &
           # Get server PID
           server_pid=$!
           # Wait for server running
@@ -161,7 +161,7 @@ jobs:
           rejection: nginx-down
           EOF2
           # Run a server in background
-          /app/rich-piping-server-alpine-x64/rich-piping-server --http-port=8080 --config-yaml-path=./config.yaml &> ./rich-piping-server.log &
+          /app/rich-piping-server-alpine-x64/rich-piping-server --http-port=8080 --config-path=./config.yaml &> ./rich-piping-server.log &
           # Wait for server running
           sleep 1
           # Create a file to send
@@ -203,7 +203,7 @@ jobs:
           rejection: nginx-down
           EOF
           # Run a server in background
-          ./rich-piping-server-mac-x64/rich-piping-server --http-port=8080 --config-yaml-path=./config.yaml &> ./rich-piping-server.log &
+          ./rich-piping-server-mac-x64/rich-piping-server --http-port=8080 --config-path=./config.yaml &> ./rich-piping-server.log &
           # Get server PID
           server_pid=$!
           # Wait for server running
@@ -256,7 +256,7 @@ jobs:
           '@ > .\config.yaml
           cat ./config.yaml
           # Run a server in background
-          $args = @("--http-port=8080", "--config-yaml-path=.\config.yaml", "--enable-https=true", "--https-port=8443", "--key-path=.\ssl_certs\server.key", "--crt-path=.\ssl_certs\server.crt")
+          $args = @("--http-port=8080", "--config-path=.\config.yaml", "--enable-https=true", "--https-port=8443", "--key-path=.\ssl_certs\server.key", "--crt-path=.\ssl_certs\server.crt")
           $server_pid = Start-Process -PassThru -FilePath .\rich-piping-server-win-x64\rich-piping-server.exe -ArgumentList $args | foreach { $_.Id }
           # Wait for server running
           sleep 2
