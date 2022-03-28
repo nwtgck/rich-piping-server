@@ -24,6 +24,7 @@ const parser = yargs
   })
   .option("enable-https", {
     describe: "Enable HTTPS",
+    boolean: true,
     default: false
   })
   .option("https-port", {
