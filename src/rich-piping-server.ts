@@ -31,7 +31,7 @@ function findAllowedPath(configAllowPaths: readonly AllowPath[], req: HttpReq): 
       return reqUrl.match(r) ?? false;
     }
     const reqUrlNormalized = normalizePath(reqUrl);
-    const newIndexNormalized = normalizePath(path.new_index);
+    const newIndexNormalized = normalizePath(path.index);
     return reqUrlNormalized.startsWith(newIndexNormalized);
   });
 }
@@ -89,11 +89,11 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
     }
     // Rewrite path for index
     // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
-    if (typeof allowedPathOrAlwaysAllowed !== "string" && "new_index" in allowedPathOrAlwaysAllowed) {
-      if (req.url === allowedPathOrAlwaysAllowed.new_index) {
+    if (typeof allowedPathOrAlwaysAllowed !== "string" && "index" in allowedPathOrAlwaysAllowed) {
+      if (req.url === allowedPathOrAlwaysAllowed.index) {
         req.url = "/";
       } else {
-        req.url = req.url?.substring(allowedPathOrAlwaysAllowed.new_index.length);
+        req.url = req.url?.substring(allowedPathOrAlwaysAllowed.index.length);
       }
     }
 

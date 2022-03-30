@@ -98,7 +98,7 @@ rejection: socket_close
     await shouldNotTransferAndSocketClosed({path: "/myallowedpath1/path1"});
   });
 
-  context("new_index", () => {
+  context("index", () => {
     it("should create a new index", async () => {
       // language=yaml
       configRef.ref = readConfigV1(`
@@ -106,7 +106,7 @@ version: "1"
 config_for: rich_piping_server
 
 allow_paths:
-  - new_index: /myindex1
+  - index: /myindex1
 rejection: socket_close
 `);
       await shouldTransfer({path: "/myindex1/path1" });
@@ -129,8 +129,8 @@ version: "1"
 config_for: rich_piping_server
 
 allow_paths:
-  - new_index: /myindex1
-  - new_index: /myindex2
+  - index: /myindex1
+  - index: /myindex2
 rejection: socket_close
 `);
       await shouldTransfer({path: "/myindex1/path1" });
