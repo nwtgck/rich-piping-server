@@ -4,6 +4,7 @@
 import * as fs from "fs";
 import * as http from "http";
 import * as http2 from "http2";
+import * as tls from "tls";
 import * as log4js from "log4js";
 import * as yargs from "yargs";
 import { z } from "zod";
@@ -132,21 +133,48 @@ http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
     logger.info(`Listen HTTP on ${httpPort}...`);
   });
 
-if (enableHttps && httpsPort !== undefined) {
-  if (serverKeyPath === undefined || serverCrtPath === undefined) {
-    logger.error("Error: --key-path and --crt-path should be specified");
-  } else {
-    http2.createSecureServer(
-      {
+if (enableHttps) {
+  if (httpsPort === undefined) {
+    logger.error("--https-port is required");
+    process.exit(1);
+  }
+  if (serverKeyPath === undefined) {
+    logger.error("--key-path is required");
+    process.exit(1);
+  }
+  if (serverCrtPath === undefined) {
+    logger.error("--crt-path is required");
+    process.exit(1);
+  }
+
+  let secureContext: tls.SecureContext | undefined;
+  const updateSecureContext = () => {
+    try {
+      secureContext = tls.createSecureContext({
         key: fs.readFileSync(serverKeyPath),
         cert: fs.readFileSync(serverCrtPath),
-        allowHTTP1: true
-      },
-      generateHandler({pipingServer, configRef, useHttps: true})
-    ).listen({ host, port: httpsPort }, () => {
-      logger.info(`Listen HTTPS on ${httpsPort}...`);
-    });
+      });
+      logger.info("Certificate loaded");
+    } catch (e) {
+      logger.error("Failed to load certificate", e);
+    }
   }
+  updateSecureContext();
+  if (secureContext === undefined) {
+    throw new Error("No certificate");
+  }
+  fs.watchFile(serverCrtPath, updateSecureContext);
+  fs.watchFile(serverKeyPath, updateSecureContext);
+
+  http2.createSecureServer(
+    {
+      SNICallback: (servername, cb) => cb(null, secureContext!),
+      allowHTTP1: true
+    },
+    generateHandler({pipingServer, configRef, useHttps: true})
+  ).listen({ host, port: httpsPort }, () => {
+    logger.info(`Listen HTTPS on ${httpsPort}...`);
+  });
 }
 
 // Catch and ignore error
