@@ -13,7 +13,7 @@ export const configV1Schema = z.object({
       password: z.string(),
     }))
   ),
-  allow_paths: z.array(
+  allow_paths: z.optional(z.array(
     z.union([
       z.string(),
       z.object({
@@ -23,7 +23,7 @@ export const configV1Schema = z.object({
         new_index: z.string(),
       }),
     ]),
-  ),
+  )),
   rejection: z.union([
     z.literal('socket_close'),
     z.object({
