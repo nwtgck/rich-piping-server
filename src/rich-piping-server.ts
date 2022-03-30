@@ -11,18 +11,18 @@ type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 type Handler = (req: HttpReq, res: HttpRes) => void;
 
-type AllowPath = ConfigV1["allow_paths"][number];
+type AllowPath = NonNullable<ConfigV1["allow_paths"]>[number];
 
 function normalizePath(path: string): string {
   return path.endsWith("/") ? path : path + "/";
 }
 
-function findAllowedPath(config: ConfigV1, req: HttpReq): AllowPath | undefined {
+function findAllowedPath(configAllowPaths: readonly AllowPath[], req: HttpReq): AllowPath | undefined {
   const reqUrl = req.url;
   if (reqUrl === undefined) {
     return undefined;
   }
-  return config.allow_paths.find(path => {
+  return configAllowPaths.find(path => {
     if (typeof path === "string") {
       return reqUrl === path;
     }
@@ -52,18 +52,24 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
       req.socket.end();
       return;
     }
-    const allowedPath = findAllowedPath(config, req);
-    if (req.url === undefined || allowedPath === undefined) {
-      if (config.rejection === 'socket_close') {
-        req.socket.end();
-        return;
+    let allowedPathOrAlwaysAllowed: AllowPath | { "always_allowed": undefined };
+    if (config.allow_paths === undefined) {
+      allowedPathOrAlwaysAllowed = { "always_allowed": undefined };
+    } else {
+      const allowedPath = findAllowedPath(config.allow_paths, req);
+      if (req.url === undefined || allowedPath === undefined) {
+        if (config.rejection === 'socket_close') {
+          req.socket.end();
+          return;
+        }
+        if (config.rejection === 'fake_nginx_down' || "fake_nginx_down" in config.rejection) {
+          const nginxVersion = (typeof config.rejection === "object" && "fake_nginx_down" in config.rejection) ? config.rejection.fake_nginx_down.nginx_version : defaultFakeNginxVersion;
+          fakeNginxResponse(res, nginxVersion, req.headers["user-agent"] ?? "");
+          return;
+        }
+        throw Error('never reach');
       }
-      if (config.rejection === 'fake_nginx_down' || "fake_nginx_down" in config.rejection) {
-        const nginxVersion = (typeof config.rejection === "object" && "fake_nginx_down" in config.rejection) ? config.rejection.fake_nginx_down.nginx_version : defaultFakeNginxVersion;
-        fakeNginxResponse(res, nginxVersion, req.headers["user-agent"] ?? "");
-        return;
-      }
-      throw Error('never reach');
+      allowedPathOrAlwaysAllowed = allowedPath;
     }
     // Basic auth is enabled
     if (config.basic_auth_users !== undefined) {
@@ -83,11 +89,11 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
     }
     // Rewrite path for index
     // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
-    if (typeof allowedPath !== "string" && "new_index" in allowedPath) {
-      if (req.url === allowedPath.new_index) {
+    if (typeof allowedPathOrAlwaysAllowed !== "string" && "new_index" in allowedPathOrAlwaysAllowed) {
+      if (req.url === allowedPathOrAlwaysAllowed.new_index) {
         req.url = "/";
       } else {
-        req.url = req.url.substring(allowedPath.new_index.length);
+        req.url = req.url?.substring(allowedPathOrAlwaysAllowed.new_index.length);
       }
     }
 

@@ -60,14 +60,27 @@ describe("Rich Piping Server (config v1)", () => {
   it("should transfer when all path allowed", async () => {
     // language=yaml
     configRef.ref = readConfigV1(`
+      version: "1"
+      config_for: rich_piping_server
+
+      rejection: socket_close
+    `);
+    await shouldTransfer({path: "/mypath1"});
+  });
+
+  it("should transfer with regular expression", async () => {
+    // language=yaml
+    configRef.ref = readConfigV1(`
 version: "1"
 config_for: rich_piping_server
 
 allow_paths:
-  - regexp: ".*"
+  - regexp: "^/[a-c]+"
 rejection: socket_close
 `);
-    await shouldTransfer({path: "/mypath1"});
+    await shouldTransfer({path: "/aabbcc"});
+    await shouldTransfer({path: "/abchoge"});
+    await shouldNotTransferAndSocketClosed({path: "/hoge"});
   });
 
   it("should transfer at only allowed path", async () => {
