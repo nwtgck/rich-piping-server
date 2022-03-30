@@ -24,3 +24,19 @@ jobs:
     - run: npm ci
     - run: npm run build
     - run: npm test
+    - name: migrate config
+      run: |
+        set -xeu
+        npm install -g .
+        cat <<EOF > "config.yaml"
+        allowPaths:
+          - /0s6twklxkrcfs1u
+          - type: regexp
+            value: "/[abcd]+"
+        basicAuthUsers:
+          - username: user1
+            password: pass1234
+        rejection: nginx-down
+        EOF
+        
+        rich-piping-server --config-path=./config.yaml migrate-config

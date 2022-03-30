@@ -49,19 +49,51 @@ const parser = yargs
     type: "string",
     required: true,
   })
-  .alias("config-path", "config-yaml-path");
+  .alias("config-path", "config-yaml-path")
+  .command("migrate-config", "Print migrated config", (yargs) => {
+  }, (argv) => {
+    const configYaml = yaml.load(fs.readFileSync(argv.configPath, 'utf8'));
+    if (configV1Schema.safeParse(configYaml).success) {
+      console.log("The config is already a valid config v1");
+      return;
+    }
+    const configParsed = configWihtoutVersionSchema.safeParse(configYaml);
+    if(!configParsed.success) {
+      const issueStack = configParsed.error.issues.slice();
+      while (issueStack.length > 0) {
+        const issue = issueStack.pop()!;
+        if (issue.code === "invalid_union") {
+          issueStack.push(...issue.unionErrors.flatMap(e => e.issues));
+          continue;
+        }
+        process.stderr.write(`config error hint: ${JSON.stringify(issue)}\n`);
+      }
+      process.exit(1);
+    }
+    const configV1 = migrateToConfigV1(configParsed.data);
+    console.log(yaml.dump(configV1));
+  });
+
 
 // Parse arguments
 const args = parser.parseSync(process.argv.slice(2));
-const host: string | undefined = args["host"];
-const httpPort: number = args["http-port"];
-const enableHttps: boolean = args["enable-https"];
-const httpsPort: number | undefined = args["https-port"];
-const serverKeyPath: string | undefined = args["key-path"];
-const serverCrtPath: string | undefined = args["crt-path"];
-const configYamlPath: string = args["config-yaml-path"];
-
 const configRef: {ref?: ConfigV1} = { };
+// Create a logger
+const logger = log4js.getLogger();
+logger.level = "info";
+
+if (args._.length === 0) {
+  serve({
+    host: args["host"],
+    httpPort: args["http-port"],
+    enableHttps: args["enable-https"],
+    httpsPort: args["https-port"],
+    serverKeyPath:  args["key-path"],
+    serverCrtPath: args["crt-path"],
+    configYamlPath:  args["config-yaml-path"],
+  });
+}
+
 
 function formatZodErrorPath(path: (string | number)[]): string {
   return `${path[0]}${path.splice(1).map(p => `[${JSON.stringify(p)}]`).join("")}`;
@@ -79,7 +111,7 @@ function logZodError<T>(zodError: z.ZodError<T>) {
   }
 }
 
-function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void {
+function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): void {
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
   try {
@@ -92,6 +124,7 @@ function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void
     }
     if (configBasicParsed.data.version === undefined) {
       logger.warn("config format is old");
+      logger.warn(`Migration guide: rich-piping-server --config-path=${configYamlPath} migrate-config`);
       const configWithoutVersionParsed = configWihtoutVersionSchema.safeParse(configYaml);
       if (!configWithoutVersionParsed.success) {
         logZodError(configWithoutVersionParsed.error);
@@ -113,71 +146,77 @@ function loadAndUpdateConfig(logger: log4js.Logger,configYamlPath: string): void
   }
 }
 
-// Create a logger
-const logger = log4js.getLogger();
-logger.level = "info";
-
+function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath }: {
+  host: string | undefined,
+  httpPort: number,
+  enableHttps: boolean,
+  httpsPort: number | undefined,
+  serverKeyPath: string | undefined,
+  serverCrtPath: string | undefined,
+  configYamlPath: string,
+}) {
 // Load config
-loadAndUpdateConfig(logger, configYamlPath);
+  loadAndUpdateConfig(logger, configYamlPath);
 
 // Watch config yaml
-fs.watch(configYamlPath, () => {
-  loadAndUpdateConfig(logger, configYamlPath);
-});
+  fs.watch(configYamlPath, () => {
+    loadAndUpdateConfig(logger, configYamlPath);
+  });
 
 // Create a piping server
-const pipingServer = new piping.Server({logger});
+  const pipingServer = new piping.Server({logger});
 
-http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
-  .listen({ host, port: httpPort }, () => {
-    logger.info(`Listen HTTP on ${httpPort}...`);
-  });
+  http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
+    .listen({ host, port: httpPort }, () => {
+      logger.info(`Listen HTTP on ${httpPort}...`);
+    });
 
-if (enableHttps) {
-  if (httpsPort === undefined) {
-    logger.error("--https-port is required");
-    process.exit(1);
-  }
-  if (serverKeyPath === undefined) {
-    logger.error("--key-path is required");
-    process.exit(1);
-  }
-  if (serverCrtPath === undefined) {
-    logger.error("--crt-path is required");
-    process.exit(1);
-  }
-
-  let secureContext: tls.SecureContext | undefined;
-  const updateSecureContext = () => {
-    try {
-      secureContext = tls.createSecureContext({
-        key: fs.readFileSync(serverKeyPath),
-        cert: fs.readFileSync(serverCrtPath),
-      });
-      logger.info("Certificate loaded");
-    } catch (e) {
-      logger.error("Failed to load certificate", e);
+  if (enableHttps) {
+    if (httpsPort === undefined) {
+      logger.error("--https-port is required");
+      process.exit(1);
     }
-  }
-  updateSecureContext();
-  if (secureContext === undefined) {
-    throw new Error("No certificate");
-  }
-  fs.watchFile(serverCrtPath, updateSecureContext);
-  fs.watchFile(serverKeyPath, updateSecureContext);
+    if (serverKeyPath === undefined) {
+      logger.error("--key-path is required");
+      process.exit(1);
+    }
+    if (serverCrtPath === undefined) {
+      logger.error("--crt-path is required");
+      process.exit(1);
+    }
 
-  http2.createSecureServer(
-    {
-      SNICallback: (servername, cb) => cb(null, secureContext!),
-      allowHTTP1: true
-    },
-    generateHandler({pipingServer, configRef, useHttps: true})
-  ).listen({ host, port: httpsPort }, () => {
-    logger.info(`Listen HTTPS on ${httpsPort}...`);
-  });
-}
+    let secureContext: tls.SecureContext | undefined;
+    const updateSecureContext = () => {
+      try {
+        secureContext = tls.createSecureContext({
+          key: fs.readFileSync(serverKeyPath),
+          cert: fs.readFileSync(serverCrtPath),
+        });
+        logger.info("Certificate loaded");
+      } catch (e) {
+        logger.error("Failed to load certificate", e);
+      }
+    }
+    updateSecureContext();
+    if (secureContext === undefined) {
+      throw new Error("No certificate");
+    }
+    fs.watchFile(serverCrtPath, updateSecureContext);
+    fs.watchFile(serverKeyPath, updateSecureContext);
+
+    http2.createSecureServer(
+      {
+        SNICallback: (servername, cb) => cb(null, secureContext!),
+        allowHTTP1: true
+      },
+      generateHandler({pipingServer, configRef, useHttps: true})
+    ).listen({ host, port: httpsPort }, () => {
+      logger.info(`Listen HTTPS on ${httpsPort}...`);
+    });
+  }
 
 // Catch and ignore error
-process.on("uncaughtException", (err) => {
-  logger.error("on uncaughtException", err);
-});
+  process.on("uncaughtException", (err) => {
+    logger.error("on uncaughtException", err);
+  });
+}
