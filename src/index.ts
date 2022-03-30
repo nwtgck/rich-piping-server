@@ -50,7 +50,7 @@ const parser = yargs
     required: true,
   })
   .alias("config-path", "config-yaml-path")
-  .command("migrate-config", "migrate an existing config to new one", (yargs) => {
+  .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
     const configYaml = yaml.load(fs.readFileSync(argv.configPath, 'utf8'));
     if (configV1Schema.safeParse(configYaml).success) {
@@ -124,6 +124,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
     }
     if (configBasicParsed.data.version === undefined) {
       logger.warn("config format is old");
+      logger.warn(`Migration guide: rich-piping-server --config-path=${configYamlPath} migrate-config`);
       const configWithoutVersionParsed = configWihtoutVersionSchema.safeParse(configYaml);
       if (!configWithoutVersionParsed.success) {
         logZodError(configWithoutVersionParsed.error);
