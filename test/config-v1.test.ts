@@ -172,8 +172,8 @@ config_for: rich_piping_server
 allow_paths:
   - /myallowedpath1
 rejection:
-  type: fake_nginx_down
-  nginx_version: 99.9.9
+  fake_nginx_down:
+    nginx_version: 99.9.9
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise

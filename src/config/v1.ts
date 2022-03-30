@@ -32,8 +32,9 @@ export const configV1Schema = z.object({
     }),
     z.literal('fake_nginx_down'),
     z.object({
-      type: z.literal('fake_nginx_down'),
-      nginx_version: z.string(),
+      fake_nginx_down: z.object({
+        nginx_version: z.string(),
+      }),
     }),
   ]),
 });
@@ -61,8 +62,9 @@ export function migrateToConfigV1(c: ConfigWithoutVersion): ConfigV1 {
         return "fake_nginx_down";
       }
       return {
-        type: "fake_nginx_down",
-        nginx_version: c.rejection.nginxVersion,
+        "fake_nginx_down": {
+          nginx_version: c.rejection.nginxVersion,
+        },
       };
     })(),
   };

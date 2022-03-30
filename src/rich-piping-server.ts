@@ -58,8 +58,8 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
         req.socket.end();
         return;
       }
-      if (config.rejection === 'fake_nginx_down' || config.rejection.type === 'fake_nginx_down') {
-        const nginxVersion = (typeof config.rejection === "object" && "type" in config.rejection) && config.rejection.type === 'fake_nginx_down' ? config.rejection.nginx_version : defaultFakeNginxVersion;
+      if (config.rejection === 'fake_nginx_down' || "fake_nginx_down" in config.rejection) {
+        const nginxVersion = (typeof config.rejection === "object" && "fake_nginx_down" in config.rejection) ? config.rejection.fake_nginx_down.nginx_version : defaultFakeNginxVersion;
         fakeNginxResponse(res, nginxVersion, req.headers["user-agent"] ?? "");
         return;
       }
