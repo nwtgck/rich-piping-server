@@ -7,13 +7,12 @@ export const configV1Schema = z.object({
   version: configV1VersionSchema,
   // "config_for" is for the future standard Piping Server using YAML config, but there is no plan to use YAML in the standard one.
   config_for: z.literal("rich_piping_server"),
-  basic_auth_users: z.union([
+  basic_auth_users: z.optional(
     z.array(z.object({
       username: z.string(),
       password: z.string(),
-    })),
-    z.undefined(),
-  ]),
+    }))
+  ),
   allow_paths: z.array(
     z.union([
       z.string(),
