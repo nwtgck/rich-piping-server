@@ -1,0 +1,315 @@
+name: Build portable binaries
+
+on: [push, pull_request]
+
+jobs:
+  build_x64_executables:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        pkg_target_without_node:
+          - linuxstatic-x64
+          - linux-x64
+          - mac-x64
+          - alpine-x64
+          - win-x64
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-node@v3.0.0
+        with:
+          node-version: '16'
+      - run: npm ci
+      - run: |
+          set -xeu
+          npm run build
+          ./node_modules/.bin/pkg --out-path=rich-piping-server-${{ matrix.pkg_target_without_node }} --targets=node16-${{ matrix.pkg_target_without_node }} ./
+      - name: tar.gz or zip
+        run: |
+          set -xeu
+          if [ "${{ matrix.pkg_target_without_node }}" = "win-x64" ]; then
+            zip -r rich-piping-server-${{ matrix.pkg_target_without_node }}.zip ./rich-piping-server-${{ matrix.pkg_target_without_node }}
+          else
+            tar czvf rich-piping-server-${{ matrix.pkg_target_without_node }}.tar.gz ./rich-piping-server-${{ matrix.pkg_target_without_node }}
+          fi
+      - uses: actions/upload-artifact@v2
+        with:
+          name: build_x64
+          path: |
+            rich-piping-server-*.tar.gz
+            rich-piping-server-*.zip
+
+  build_arm_executables:
+    # Only run with tags because ARM builds are slow
+    if: startsWith( github.ref, 'refs/tags/')
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        pkg_target_without_node:
+          - linuxstatic-arm64
+          - linuxstatic-armv7
+          - linux-arm64
+          - mac-arm64
+          - alpine-arm64
+          - win-arm64
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - run: |
+          set -xeu
+          # NOTE: node:16 image causes an error "glob error [Error: EACCES: permission denied, scandir '/root/.npm/_logs'] { ..."
+          docker run --rm -i -v $PWD:/app --platform=linux/arm64/v8 node:14 bash << 'EOF'
+          set -xeu
+          # Install ldid for macos-arm64 signing
+          curl -LO https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus2/ldid_linux_aarch64
+          chmod +x ldid_linux_aarch64
+          mv ./ldid_linux_aarch64 /usr/local/bin/ldid
+          cd /app
+          npm ci
+          npm run build
+          ./node_modules/.bin/pkg --out-path=rich-piping-server-${{ matrix.pkg_target_without_node }} --targets=node16-${{ matrix.pkg_target_without_node }} ./
+          EOF
+      - name: tar.gz or zip
+        run: |
+          set -xeu
+          if [ "${{ matrix.pkg_target_without_node }}" = "win-arm64" ]; then
+            zip -r rich-piping-server-${{ matrix.pkg_target_without_node }}.zip ./rich-piping-server-${{ matrix.pkg_target_without_node }}
+          else
+            tar czvf rich-piping-server-${{ matrix.pkg_target_without_node }}.tar.gz ./rich-piping-server-${{ matrix.pkg_target_without_node }}
+          fi
+      - uses: actions/upload-artifact@v2
+        with:
+          name: build_arm
+          path: |
+            rich-piping-server-*.tar.gz
+            rich-piping-server-*.zip
+
+  linux_operational_test:
+    runs-on: ubuntu-18.04
+    needs: build_x64_executables
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: build_x64
+          path: .
+      - name: Unarchive tar.gz
+        run: tar xvf rich-piping-server-linuxstatic-x64.tar.gz
+      - name: Operational test
+        run: |
+          set -xeu
+          cat <<EOF > "config.yaml"
+          allowPaths:
+            - /0s6twklxkrcfs1u
+            - type: regexp
+              value: "/[abcd]+"
+          basicAuthUsers:
+            - username: user1
+              password: pass1234
+          rejection: nginx-down
+          EOF
+          # Run a server in background
+          ./rich-piping-server-linuxstatic-x64/rich-piping-server --http-port=8080 --config-path=./config.yaml &> ./rich-piping-server.log &
+          # Get server PID
+          server_pid=$!
+          # Wait for server running
+          sleep 1
+          # Create a file to send
+          echo 'hello, world' > /tmp/hello.txt
+          # Send and wait for a receiver
+          curl -u user1:pass1234 -T /tmp/hello.txt localhost:8080/0s6twklxkrcfs1u &
+          # Get data as a file
+          curl -u user1:pass1234 localhost:8080/0s6twklxkrcfs1u > /tmp/download.txt
+          # Print downloaded file
+          cat  /tmp/download.txt
+          # Test the equality
+          diff /tmp/hello.txt /tmp/download.txt
+
+          # Print server's log
+          cat ./rich-piping-server.log
+
+          # Stop the server
+          kill $server_pid
+
+  alpine_operational_test:
+    runs-on: ubuntu-18.04
+    needs: build_x64_executables
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: build_x64
+          path: .
+      - name: Unarchive tar.gz
+        run: tar xvf rich-piping-server-alpine-x64.tar.gz
+      - name: Operational test
+        run: |
+          docker run --rm -i -v $PWD:/app alpine:3.14 /bin/sh << EOF
+          set -xeu
+          apk add curl
+
+          cat <<EOF2 > "config.yaml"
+          allowPaths:
+            - /0s6twklxkrcfs1u
+            - type: regexp
+              value: "/[abcd]+"
+          basicAuthUsers:
+            - username: user1
+              password: pass1234
+          rejection: nginx-down
+          EOF2
+          # Run a server in background
+          /app/rich-piping-server-alpine-x64/rich-piping-server --http-port=8080 --config-path=./config.yaml &> ./rich-piping-server.log &
+          # Wait for server running
+          sleep 1
+          # Create a file to send
+          echo 'hello, world' > /tmp/hello.txt
+          # Send and wait for a receiver
+          curl -u user1:pass1234 -T /tmp/hello.txt localhost:8080/0s6twklxkrcfs1u &
+          # Get data as a file
+          curl -u user1:pass1234 localhost:8080/0s6twklxkrcfs1u > /tmp/download.txt
+          # Print downloaded file
+          cat  /tmp/download.txt
+          # Test the equality
+          diff /tmp/hello.txt /tmp/download.txt
+
+          # Print server's log
+          cat ./rich-piping-server.log
+          EOF
+
+  macos_operational_test:
+    runs-on: macos-10.15
+    needs: build_x64_executables
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: build_x64
+          path: .
+      - name: Unarchive tar.gz
+        run: tar xvf rich-piping-server-mac-x64.tar.gz
+      - name: Operational test
+        run: |
+          set -xeu
+          cat <<EOF > "config.yaml"
+          allowPaths:
+            - /0s6twklxkrcfs1u
+            - type: regexp
+              value: "/[abcd]+"
+          basicAuthUsers:
+            - username: user1
+              password: pass1234
+          rejection: nginx-down
+          EOF
+          # Run a server in background
+          ./rich-piping-server-mac-x64/rich-piping-server --http-port=8080 --config-path=./config.yaml &> ./rich-piping-server.log &
+          # Get server PID
+          server_pid=$!
+          # Wait for server running
+          sleep 1
+          # Create a file to send
+          echo 'hello, world' > /tmp/hello.txt
+          # Send and wait for a receiver
+          curl -u user1:pass1234 -T /tmp/hello.txt localhost:8080/0s6twklxkrcfs1u &
+          # Get data as a file
+          curl -u user1:pass1234 localhost:8080/0s6twklxkrcfs1u> /tmp/download.txt
+          # Print downloaded file
+          cat  /tmp/download.txt
+          # Test the equality
+          diff /tmp/hello.txt /tmp/download.txt
+
+          # Print server's log
+          cat ./rich-piping-server.log
+
+          # Stop the server
+          kill $server_pid
+
+  windows_operational_test:
+    runs-on: windows-2019
+    needs: build_x64_executables
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: build_x64
+          path: .
+      - name: Unarchive zip
+        run: unzip rich-piping-server-win-x64.zip
+      - name: Create certificates
+        run: |
+          mkdir ssl_certs
+          cd ssl_certs
+          openssl genrsa 2048 > server.key
+          openssl req -new -key server.key -subj "/C=JP" > server.csr
+          cat server.csr | openssl x509 -req -days 3650 -signkey server.key > server.crt
+      - name: Operational test
+        run: |
+          echo @'
+          allowPaths:
+            - /0s6twklxkrcfs1u
+            - type: regexp
+              value: "/[abcd]+"
+          basicAuthUsers:
+            - username: user1
+              password: pass1234
+          rejection: nginx-down
+          '@ > .\config.yaml
+          cat ./config.yaml
+          # Run a server in background
+          $args = @("--http-port=8080", "--config-path=.\config.yaml", "--enable-https", "--https-port=8443", "--key-path=.\ssl_certs\server.key", "--crt-path=.\ssl_certs\server.crt")
+          $server_pid = Start-Process -PassThru -FilePath .\rich-piping-server-win-x64\rich-piping-server.exe -ArgumentList $args | foreach { $_.Id }
+          # Wait for server running
+          sleep 2
+          # Create a file to send
+          echo 'hello, world' > C:\Temp\hello.txt
+
+          # Send and wait for a receiver
+          curl -u user1:pass1234 -T C:\Temp\hello.txt localhost:8080/0s6twklxkrcfs1u &
+          # Get data as a file
+          curl -u user1:pass1234 localhost:8080/0s6twklxkrcfs1u > C:\Temp\download.txt
+          # Print downloaded file
+          cat  C:\Temp\download.txt
+          # Test the equality
+          diff C:\Temp\hello.txt C:\Temp\download.txt
+
+          # Send and wait for a receiver
+          curl -u user1:pass1234 -kT C:\Temp\hello.txt https://localhost:8443/0s6twklxkrcfs1u &
+          # Get data as a file
+          curl -u user1:pass1234 -k https://localhost:8443/0s6twklxkrcfs1u > C:\Temp\download_https.txt
+          # Print downloaded file
+          cat C:\Temp\download_https.txt
+          # Test the equality
+          diff C:\Temp\hello.txt C:\Temp\download_https.txt
+
+          # Stop the server
+          kill $server_pid
+
+  release_executables:
+    if: startsWith( github.ref, 'refs/tags/')
+    needs:
+      - linux_operational_test
+      - alpine_operational_test
+      - macos_operational_test
+      - windows_operational_test
+      - build_arm_executables
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: build_x64
+          path: .
+      - uses: actions/download-artifact@v2
+        with:
+          name: build_arm
+          path: .
+      - run: |
+          set -xeu
+          mkdir ./publish_dir
+          mv rich-piping-server-* ./publish_dir
+          # Show and create checksums
+          (cd publish_dir && sha256sum * | tee /dev/stderr > sha256sums.txt)
+          TAG=$(echo $GITHUB_REF | cut -d / -f 3)
+          VERSION=$TAG
+          REPO=$(echo $GITHUB_REPOSITORY | cut -d / -f 2)
+          curl -L https://github.com/tcnksm/ghr/releases/download/v0.14.0/ghr_v0.14.0_linux_amd64.tar.gz | tar xzf -
+          ./ghr_v0.14.0_linux_amd64/ghr -t ${{ secrets.GITHUB_TOKEN }} -u ${GITHUB_ACTOR} -r ${REPO} -c ${GITHUB_SHA} -delete ${VERSION} ./publish_dir

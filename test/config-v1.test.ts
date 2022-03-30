@@ -1,10 +1,11 @@
 import * as assert from "power-assert";
 import * as http from "http";
-import {closePromise, readConfigWithoutVersionAndMigrateToV1, servePromise} from "./test-utils";
+import {closePromise, readConfigV1, servePromise} from "./test-utils";
 import thenRequest from "then-request";
 import {ConfigV1} from "../src/config/v1";
+import * as pipingVersion from "piping-server/dist/src/version";
 
-describe("Rich Piping Server", () => {
+describe("Rich Piping Server (config v1)", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
@@ -58,32 +59,115 @@ describe("Rich Piping Server", () => {
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-allowPaths:
-  - type: regexp
-    value: "/.*"
-rejection: socket-close
-`);
+    configRef.ref = readConfigV1(`
+      version: "1"
+      config_for: rich_piping_server
+
+      rejection: socket_close
+    `);
     await shouldTransfer({path: "/mypath1"});
+  });
+
+  it("should transfer with regular expression", async () => {
+    // language=yaml
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
+  - regexp: "^/[a-c]+"
+rejection: socket_close
+`);
+    await shouldTransfer({path: "/aabbcc"});
+    await shouldTransfer({path: "/abchoge"});
+    await shouldNotTransferAndSocketClosed({path: "/hoge"});
   });
 
   it("should transfer at only allowed path", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-allowPaths:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
   - /myallowedpath1
-rejection: socket-close
+rejection: socket_close
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
+    await shouldNotTransferAndSocketClosed({path: "/myallowedpath1/path1"});
+  });
+
+  context("index", () => {
+    it("should create a new index", async () => {
+      // language=yaml
+      configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
+  - index: /myindex1
+rejection: socket_close
+`);
+      await shouldTransfer({path: "/myindex1/path1" });
+      // Should respond simple Web UI
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1`);
+        assert(res.getBody("UTF-8").includes("Piping"));
+      }
+      // Should respond version
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1/version`);
+        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+      }
+    });
+
+    it("should create multiple indexes", async () => {
+      // language=yaml
+      configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
+  - index: /myindex1
+  - index: /myindex2
+rejection: socket_close
+`);
+      await shouldTransfer({path: "/myindex1/path1" });
+      // Should respond simple Web UI
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1`);
+        assert(res.getBody("UTF-8").includes("Piping"));
+      }
+      // Should respond version
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex1/version`);
+        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+      }
+
+      await shouldTransfer({path: "/myindex2/path1" });
+      // Should respond simple Web UI
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex2`);
+        assert(res.getBody("UTF-8").includes("Piping"));
+      }
+      // Should respond version
+      {
+        const res = await thenRequest("GET", `${pipingUrl}/myindex2/version`);
+        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+      }
+    });
   });
 
   it("should reject with Nginx error page", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-allowPaths:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
   - /myallowedpath1
-rejection: nginx-down
+rejection: fake_nginx_down
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
@@ -94,12 +178,15 @@ rejection: nginx-down
 
   it("should reject with Nginx error page with Nginx version", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-allowPaths:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+allow_paths:
   - /myallowedpath1
 rejection:
-  type: nginx-down
-  nginxVersion: 99.9.9
+  fake_nginx_down:
+    nginx_version: 99.9.9
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
@@ -110,13 +197,16 @@ rejection:
 
   it("should transfer with basic auth", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
-basicAuthUsers:
+    configRef.ref = readConfigV1(`
+version: "1"
+config_for: rich_piping_server
+
+basic_auth_users:
   - username: user1
     password: pass1234
-allowPaths:
+allow_paths:
   - /myallowedpath1
-rejection: socket-close
+rejection: socket_close
 `);
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
     await shouldTransfer({
