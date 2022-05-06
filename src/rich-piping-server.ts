@@ -1,7 +1,7 @@
 import * as http from "http";
 import * as http2 from "http2";
 import {Server as PipingServer} from "piping-server";
-import * as basicAuth from "basic-auth";
+import basicAuth from "basic-auth";
 
 import {fakeNginxResponse} from "./fake-nginx-response";
 import {ConfigV1} from "./config/v1";

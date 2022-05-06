@@ -1,4 +1,4 @@
-import * as assert from "power-assert";
+import assert from "power-assert";
 import * as http from "http";
 import {closePromise, readConfigV1, servePromise} from "./test-utils";
 import thenRequest from "then-request";

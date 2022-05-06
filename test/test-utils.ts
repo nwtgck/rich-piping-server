@@ -1,6 +1,6 @@
 import * as http from "http";
 import * as http2 from "http2";
-import * as getPort from "get-port";
+import getPort from "get-port";
 import * as piping from "piping-server";
 import * as richPipingServer from "../src/rich-piping-server";
 import * as log4js from "log4js";
