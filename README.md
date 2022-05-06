@@ -103,3 +103,9 @@ Options:
   --crt-path                         Certification path                 [string]
   --config-path, --config-yaml-path  Config YAML path        [string] [required]
 ```
+
+## Relation to Piping Server
+Rich Piping Server uses internally Piping Server as a library:  
+<https://github.com/nwtgck/rich-piping-server/blob/7e687bfef0228eea4879c968729b31c0d839347b/src/rich-piping-server.ts#L3>
+
+Transfer logic is completely the same as the original Piping Server.
