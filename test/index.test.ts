@@ -1,7 +1,12 @@
 import * as assert from "power-assert";
 import * as http from "http";
-import {closePromise, readConfigWithoutVersionAndMigrateToV1, servePromise} from "./test-utils";
-import thenRequest from "then-request";
+import {
+  closePromise,
+  createTransferAssertions,
+  readConfigWithoutVersionAndMigrateToV1,
+  requestWithoutKeepAlive,
+  servePromise
+} from "./test-utils";
 import {ConfigV1} from "../src/config/v1";
 
 describe("Rich Piping Server", () => {
@@ -23,38 +28,10 @@ describe("Rich Piping Server", () => {
     await closePromise(richPipingServerHttpServer);
   });
 
-  async function shouldTransfer(params: { path: string, headers?: http.IncomingHttpHeaders }) {
-    // Get request promise
-    const resPromise = thenRequest("GET", `${pipingUrl}${params.path}`, {
-      headers: params.headers,
-    });
-
-    // Send data
-    await thenRequest("POST", `${pipingUrl}${params.path}`, {
-      headers: params.headers,
-      body: "this is a content",
-    });
-
-    // Wait for response
-    const res = await resPromise;
-
-    // Body should be the sent data
-    assert.strictEqual(res.getBody("UTF-8"), "this is a content");
-    // Content-length should be returned
-    assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
-    assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
-  }
-
-  async function shouldNotTransferAndSocketClosed(params: { path: string }) {
-    try {
-      await shouldTransfer({path: params.path});
-      throw new Error("should not transfer");
-    } catch (err: any) {
-      if (err.code !== "ECONNRESET") {
-        throw new Error("code is not 'ECONNRESET'");
-      }
-    }
-  }
+  const {
+    shouldTransfer,
+    shouldNotTransferAndSocketClosed
+  } = createTransferAssertions({ getPipingUrl: () => pipingUrl });
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
@@ -87,7 +64,7 @@ rejection: nginx-down
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
-    const res = await thenRequest("GET", `${pipingUrl}/mypath1`);
+    const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
     assert.strictEqual(res.statusCode, 500);
     assert.strictEqual(res.headers.server, "nginx/1.17.8");
   });
@@ -103,7 +80,7 @@ rejection:
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
-    const res = await thenRequest("GET", `${pipingUrl}/mypath1`);
+    const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
     assert.strictEqual(res.statusCode, 500);
     assert.strictEqual(res.headers.server, "nginx/99.9.9");
   });

@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+## [0.2.2] - 2023-02-18
+### Changed
+* Update dependencies
+* (Docker) Upgrade Docker base image to node:16.17.0-alpine
+
+### Fixed
+* Change the way of setting secure context to avoid an error "curl: (35) error:14004410:SSL routines:CONNECT_CR_SRVR_HELLO:sslv3 alert handshake failure" on client side in some environment
+
 ## [0.2.1] - 2022-04-09
 ### Changed
 * Update dependencies
@@ -27,6 +35,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 * Support TLS certificate hot reload
 * Add "migrate-config" subcommand
 
-[Unreleased]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/nwtgck/rich-piping-server/compare/v0.1.2...v0.2.0

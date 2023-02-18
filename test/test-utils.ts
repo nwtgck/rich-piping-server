@@ -7,6 +7,9 @@ import * as log4js from "log4js";
 import * as yaml from "js-yaml";
 import {configWihtoutVersionSchema} from "../src/config/without-version";
 import {ConfigV1, configV1Schema, migrateToConfigV1} from "../src/config/v1";
+import * as undici from "undici";
+import {URL, UrlObject} from "url";
+import * as assert from "power-assert";
 
 /**
  * Listen on the specified port
@@ -52,6 +55,61 @@ export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: s
     pipingUrl,
     richPipingServerHttpServer,
     configRef,
+  };
+}
+
+// NOTE: with keep-alive test will be slow
+export function requestWithoutKeepAlive(
+  url: string | URL | UrlObject,
+  options?: Omit<undici.Dispatcher.RequestOptions, 'origin' | 'path' | 'method'> & Partial<Pick<undici.Dispatcher.RequestOptions, 'method'>>,
+): Promise<undici.Dispatcher.ResponseData> {
+  return undici.request(url, {
+    ...options,
+    dispatcher: new undici.Agent({ pipelining: 0 }), // For disabling keep alive
+  });
+}
+
+
+export function createTransferAssertions({getPipingUrl}: { getPipingUrl: () => string }) {
+  async function shouldTransfer(params: { path: string, headers?: http.IncomingHttpHeaders }) {
+    const pipingUrl = getPipingUrl();
+
+    // Get request promise
+    const resPromise = requestWithoutKeepAlive(`${pipingUrl}${params.path}`, {
+      headers: params.headers,
+    });
+
+    // Send data
+    await requestWithoutKeepAlive(`${pipingUrl}${params.path}`, {
+      method: "POST",
+      headers: params.headers,
+      body: "this is a content",
+    });
+
+    // Wait for response
+    const res = await resPromise;
+
+    // Body should be the sent data
+    assert.strictEqual(await res.body.text(), "this is a content");
+    // Content-length should be returned
+    assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
+  }
+
+  async function shouldNotTransferAndSocketClosed(params: { path: string }) {
+    try {
+      await shouldTransfer({path: params.path});
+      throw new Error("should not transfer");
+    } catch (err: unknown) {
+      if (err instanceof undici.errors.SocketError && err.message === "other side closed") {
+        return;
+      }
+      throw new Error("socket not closed");
+    }
+  }
+
+  return {
+    shouldTransfer,
+    shouldNotTransferAndSocketClosed,
   };
 }
 
