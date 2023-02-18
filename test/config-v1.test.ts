@@ -1,9 +1,9 @@
 import * as assert from "power-assert";
 import * as http from "http";
-import {closePromise, readConfigV1, servePromise} from "./test-utils";
-import thenRequest from "then-request";
+import {closePromise, readConfigV1, requestWithoutKeepAlive, servePromise} from "./test-utils";
 import {ConfigV1} from "../src/config/v1";
 import * as pipingVersion from "piping-server/dist/src/version";
+import * as undici from "undici";
 
 describe("Rich Piping Server (config v1)", () => {
   let richPipingServerHttpServer: http.Server;
@@ -26,12 +26,13 @@ describe("Rich Piping Server (config v1)", () => {
 
   async function shouldTransfer(params: { path: string, headers?: http.IncomingHttpHeaders }) {
     // Get request promise
-    const resPromise = thenRequest("GET", `${pipingUrl}${params.path}`, {
+    const resPromise = requestWithoutKeepAlive(`${pipingUrl}${params.path}`, {
       headers: params.headers,
     });
 
     // Send data
-    await thenRequest("POST", `${pipingUrl}${params.path}`, {
+    await requestWithoutKeepAlive(`${pipingUrl}${params.path}`, {
+      method: "POST",
       headers: params.headers,
       body: "this is a content",
     });
@@ -40,7 +41,7 @@ describe("Rich Piping Server (config v1)", () => {
     const res = await resPromise;
 
     // Body should be the sent data
-    assert.strictEqual(res.getBody("UTF-8"), "this is a content");
+    assert.strictEqual(await res.body.text(), "this is a content");
     // Content-length should be returned
     assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
     assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
@@ -50,10 +51,11 @@ describe("Rich Piping Server (config v1)", () => {
     try {
       await shouldTransfer({path: params.path});
       throw new Error("should not transfer");
-    } catch (err: any) {
-      if (err.code !== "ECONNRESET") {
-        throw new Error("code is not 'ECONNRESET'");
+    } catch (err: unknown) {
+      if (err instanceof undici.errors.SocketError && err.message === "other side closed") {
+        return;
       }
+      throw new Error("socket not closed");
     }
   }
 
@@ -112,13 +114,13 @@ rejection: socket_close
       await shouldTransfer({path: "/myindex1/path1" });
       // Should respond simple Web UI
       {
-        const res = await thenRequest("GET", `${pipingUrl}/myindex1`);
-        assert(res.getBody("UTF-8").includes("Piping"));
+        const res = await requestWithoutKeepAlive(`${pipingUrl}/myindex1`);
+        assert((await res.body.text()).includes("Piping"));
       }
       // Should respond version
       {
-        const res = await thenRequest("GET", `${pipingUrl}/myindex1/version`);
-        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+        const res = await requestWithoutKeepAlive(`${pipingUrl}/myindex1/version`);
+        assert.strictEqual((await res.body.text()).trim(), pipingVersion.VERSION);
       }
     });
 
@@ -136,25 +138,25 @@ rejection: socket_close
       await shouldTransfer({path: "/myindex1/path1" });
       // Should respond simple Web UI
       {
-        const res = await thenRequest("GET", `${pipingUrl}/myindex1`);
-        assert(res.getBody("UTF-8").includes("Piping"));
+        const res = await requestWithoutKeepAlive(`${pipingUrl}/myindex1`);
+        assert((await res.body.text()).includes("Piping"));
       }
       // Should respond version
       {
-        const res = await thenRequest("GET", `${pipingUrl}/myindex1/version`);
-        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+        const res = await requestWithoutKeepAlive(`${pipingUrl}/myindex1/version`);
+        assert.strictEqual((await res.body.text()).trim(), pipingVersion.VERSION);
       }
 
       await shouldTransfer({path: "/myindex2/path1" });
       // Should respond simple Web UI
       {
-        const res = await thenRequest("GET", `${pipingUrl}/myindex2`);
-        assert(res.getBody("UTF-8").includes("Piping"));
+        const res = await requestWithoutKeepAlive(`${pipingUrl}/myindex2`);
+        assert((await res.body.text()).includes("Piping"));
       }
       // Should respond version
       {
-        const res = await thenRequest("GET", `${pipingUrl}/myindex2/version`);
-        assert.strictEqual(res.getBody("UTF-8").trim(), pipingVersion.VERSION);
+        const res = await requestWithoutKeepAlive(`${pipingUrl}/myindex2/version`);
+        assert.strictEqual((await res.body.text()).trim(), pipingVersion.VERSION);
       }
     });
   });
@@ -171,7 +173,7 @@ rejection: fake_nginx_down
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
-    const res = await thenRequest("GET", `${pipingUrl}/mypath1`);
+    const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
     assert.strictEqual(res.statusCode, 500);
     assert.strictEqual(res.headers.server, "nginx/1.17.8");
   });
@@ -190,7 +192,7 @@ rejection:
 `);
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
-    const res = await thenRequest("GET", `${pipingUrl}/mypath1`);
+    const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
     assert.strictEqual(res.statusCode, 500);
     assert.strictEqual(res.headers.server, "nginx/99.9.9");
   });

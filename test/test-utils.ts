@@ -7,6 +7,8 @@ import * as log4js from "log4js";
 import * as yaml from "js-yaml";
 import {configWihtoutVersionSchema} from "../src/config/without-version";
 import {ConfigV1, configV1Schema, migrateToConfigV1} from "../src/config/v1";
+import * as undici from "undici";
+import {URL, UrlObject} from "url";
 
 /**
  * Listen on the specified port
@@ -53,6 +55,17 @@ export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: s
     richPipingServerHttpServer,
     configRef,
   };
+}
+
+// NOTE: with keep-alive test will be slow
+export function requestWithoutKeepAlive(
+  url: string | URL | UrlObject,
+  options?: Omit<undici.Dispatcher.RequestOptions, 'origin' | 'path' | 'method'> & Partial<Pick<undici.Dispatcher.RequestOptions, 'method'>>,
+): Promise<undici.Dispatcher.ResponseData> {
+  return undici.request(url, {
+    ...options,
+    dispatcher: new undici.Agent({ pipelining: 0 }), // For disabling keep alive
+  });
 }
 
 export function readConfigWithoutVersionAndMigrateToV1(yamlString: string): ConfigV1 {
