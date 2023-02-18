@@ -2,11 +2,11 @@ import * as assert from "power-assert";
 import * as http from "http";
 import {
   closePromise,
+  createTransferAssertions,
   readConfigWithoutVersionAndMigrateToV1,
   requestWithoutKeepAlive,
   servePromise
 } from "./test-utils";
-import * as undici from "undici";
 import {ConfigV1} from "../src/config/v1";
 
 describe("Rich Piping Server", () => {
@@ -28,40 +28,10 @@ describe("Rich Piping Server", () => {
     await closePromise(richPipingServerHttpServer);
   });
 
-  async function shouldTransfer(params: { path: string, headers?: http.IncomingHttpHeaders }) {
-    // Get request promise
-    const resPromise = requestWithoutKeepAlive(`${pipingUrl}${params.path}`, {
-      headers: params.headers,
-    });
-
-    // Send data
-    await requestWithoutKeepAlive(`${pipingUrl}${params.path}`, {
-      method: "POST",
-      headers: params.headers,
-      body: "this is a content",
-    });
-
-    // Wait for response
-    const res = await resPromise;
-
-    // Body should be the sent data
-    assert.strictEqual(await res.body.text(), "this is a content");
-    // Content-length should be returned
-    assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
-    assert.strictEqual(res.headers["content-length"], "this is a content".length.toString());
-  }
-
-  async function shouldNotTransferAndSocketClosed(params: { path: string }) {
-    try {
-      await shouldTransfer({path: params.path});
-      throw new Error("should not transfer");
-    } catch (err: unknown) {
-      if (err instanceof undici.errors.SocketError && err.message === "other side closed") {
-        return;
-      }
-      throw new Error("socket not closed");
-    }
-  }
+  const {
+    shouldTransfer,
+    shouldNotTransferAndSocketClosed
+  } = createTransferAssertions({ getPipingUrl: () => pipingUrl });
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
