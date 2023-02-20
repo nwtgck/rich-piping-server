@@ -18,6 +18,7 @@ function normalizePath(path: string): string {
 }
 
 function findAllowedPath(configAllowPaths: readonly AllowPath[], req: HttpReq): AllowPath | undefined {
+  // TODO: consider query parameter
   const reqUrl = req.url;
   if (reqUrl === undefined) {
     return undefined;
@@ -43,6 +44,7 @@ function basicAuthDenied(res: HttpRes) {
   res.end("Access denied\n");
 }
 
+const alwaysAllowed = Symbol("always_allowed");
 const defaultFakeNginxVersion = "1.17.8";
 export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref?: ConfigV1 | undefined}, useHttps: boolean}): Handler {
   const pipingHandler = pipingServer.generateHandler(useHttps);
@@ -52,9 +54,9 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
       req.socket.end();
       return;
     }
-    let allowedPathOrAlwaysAllowed: AllowPath | { "always_allowed": undefined };
+    let allowedPathOrAlwaysAllowed: AllowPath | typeof alwaysAllowed;
     if (config.allow_paths === undefined) {
-      allowedPathOrAlwaysAllowed = { "always_allowed": undefined };
+      allowedPathOrAlwaysAllowed = alwaysAllowed;
     } else {
       const allowedPath = findAllowedPath(config.allow_paths, req);
       if (req.url === undefined || allowedPath === undefined) {
@@ -67,6 +69,7 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
           fakeNginxResponse(res, nginxVersion, req.headers["user-agent"] ?? "");
           return;
         }
+        // TODO: 500 error
         throw Error('never reach');
       }
       allowedPathOrAlwaysAllowed = allowedPath;
@@ -89,7 +92,7 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
     }
     // Rewrite path for index
     // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
-    if (typeof allowedPathOrAlwaysAllowed !== "string" && "index" in allowedPathOrAlwaysAllowed) {
+    if (allowedPathOrAlwaysAllowed !== alwaysAllowed && typeof allowedPathOrAlwaysAllowed !== "string" && "index" in allowedPathOrAlwaysAllowed) {
       if (req.url === allowedPathOrAlwaysAllowed.index) {
         req.url = "/";
       } else {
