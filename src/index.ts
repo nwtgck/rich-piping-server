@@ -156,15 +156,15 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
   serverCrtPath: string | undefined,
   configYamlPath: string,
 }) {
-// Load config
+  // Load config
   loadAndUpdateConfig(logger, configYamlPath);
 
-// Watch config yaml
+  // Watch config yaml
   fs.watch(configYamlPath, () => {
     loadAndUpdateConfig(logger, configYamlPath);
   });
 
-// Create a piping server
+  // Create a piping server
   const pipingServer = new piping.Server({logger});
 
   http.createServer(generateHandler({pipingServer, configRef, logger, useHttps: false}))
@@ -212,7 +212,7 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
     });
   }
 
-// Catch and ignore error
+  // Catch and ignore error
   process.on("uncaughtException", (err) => {
     logger.error("on uncaughtException", err);
   });
