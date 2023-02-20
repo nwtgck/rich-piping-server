@@ -27,10 +27,10 @@ allow_paths:
   # Create multiple "index".
   - index: /mytop2
 
-# Respond a fake nginx 500 down page when rejected
+# Respond a fake nginx 500 down page when path not allowed
 rejection: fake_nginx_down
 
-# Close socket when rejected
+# Close socket when path not allowed
 #rejection: socket_close
 
 # Respond a fake nginx 500 down with version
