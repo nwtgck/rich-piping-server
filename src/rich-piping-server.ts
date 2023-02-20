@@ -71,8 +71,8 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
           fakeNginxResponse(res, config.rejection.nginx_version, req.headers["user-agent"] ?? "");
           return;
         }
-        // TODO: 500 error
-        throw Error('never reach');
+        // exhaustive check
+        throw Error(`unknown rejection type: ${(config.rejection as { type: never }).type}`);
       }
       allowedPathOrAlwaysAllowed = allowedPath;
     }
