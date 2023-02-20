@@ -4,14 +4,13 @@ import {Server as PipingServer} from "piping-server";
 import * as basicAuth from "basic-auth";
 
 import {fakeNginxResponse} from "./fake-nginx-response";
-import {ConfigV1} from "./config/v1";
-
+import {type NormalizedConfig} from "./config/normalized-config";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 type Handler = (req: HttpReq, res: HttpRes) => void;
 
-type AllowPath = NonNullable<ConfigV1["allow_paths"]>[number];
+type AllowPath = NonNullable<NormalizedConfig["allow_paths"]>[number];
 
 function normalizePath(path: string): string {
   return path.endsWith("/") ? path : path + "/";
@@ -24,16 +23,20 @@ function findAllowedPath(configAllowPaths: readonly AllowPath[], req: HttpReq): 
     return undefined;
   }
   return configAllowPaths.find(path => {
-    if (typeof path === "string") {
-      return reqUrl === path;
+    if (path.type === "path") {
+      return reqUrl === path.value;
     }
-    if ("regexp" in path) {
-      const r = new RegExp(path.regexp);
+    if (path.type === "regexp") {
+      const r = new RegExp(path.value);
       return reqUrl.match(r) ?? false;
     }
-    const reqUrlNormalized = normalizePath(reqUrl);
-    const newIndexNormalized = normalizePath(path.index);
-    return reqUrlNormalized.startsWith(newIndexNormalized);
+    if (path.type === "index") {
+      const reqUrlNormalized = normalizePath(reqUrl);
+      const newIndexNormalized = normalizePath(path.value);
+      return reqUrlNormalized.startsWith(newIndexNormalized);
+    }
+    // exhaustive check
+    throw new Error(`unknown path type: ${(path as { type: never }).type}`);
   });
 }
 
@@ -44,9 +47,7 @@ function basicAuthDenied(res: HttpRes) {
   res.end("Access denied\n");
 }
 
-const alwaysAllowed = Symbol("always_allowed");
-const defaultFakeNginxVersion = "1.17.8";
-export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref?: ConfigV1 | undefined}, useHttps: boolean}): Handler {
+export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref?: NormalizedConfig | undefined}, useHttps: boolean}): Handler {
   const pipingHandler = pipingServer.generateHandler(useHttps);
   return (req, res) => {
     const config = configRef.ref;
@@ -54,19 +55,18 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
       req.socket.end();
       return;
     }
-    let allowedPathOrAlwaysAllowed: AllowPath | typeof alwaysAllowed;
+    let allowedPathOrAlwaysAllowed: AllowPath | { type: "always_allowed" };
     if (config.allow_paths === undefined) {
-      allowedPathOrAlwaysAllowed = alwaysAllowed;
+      allowedPathOrAlwaysAllowed = { type: "always_allowed" };
     } else {
       const allowedPath = findAllowedPath(config.allow_paths, req);
       if (req.url === undefined || allowedPath === undefined) {
-        if (config.rejection === 'socket_close') {
+        if (config.rejection.type === 'socket_close') {
           req.socket.end();
           return;
         }
-        if (config.rejection === 'fake_nginx_down' || "fake_nginx_down" in config.rejection) {
-          const nginxVersion = (typeof config.rejection === "object" && "fake_nginx_down" in config.rejection) ? config.rejection.fake_nginx_down.nginx_version : defaultFakeNginxVersion;
-          fakeNginxResponse(res, nginxVersion, req.headers["user-agent"] ?? "");
+        if (config.rejection.type === "fake_nginx_down") {
+          fakeNginxResponse(res, config.rejection.nginx_version, req.headers["user-agent"] ?? "");
           return;
         }
         // TODO: 500 error
@@ -92,11 +92,11 @@ export function generateHandler({pipingServer, configRef, useHttps}: {pipingServ
     }
     // Rewrite path for index
     // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
-    if (allowedPathOrAlwaysAllowed !== alwaysAllowed && typeof allowedPathOrAlwaysAllowed !== "string" && "index" in allowedPathOrAlwaysAllowed) {
-      if (req.url === allowedPathOrAlwaysAllowed.index) {
+    if (allowedPathOrAlwaysAllowed.type === "index") {
+      if (req.url === allowedPathOrAlwaysAllowed.value) {
         req.url = "/";
       } else {
-        req.url = req.url?.substring(allowedPathOrAlwaysAllowed.index.length);
+        req.url = req.url?.substring(allowedPathOrAlwaysAllowed.value.length);
       }
     }
 

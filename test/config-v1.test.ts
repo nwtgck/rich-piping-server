@@ -3,18 +3,18 @@ import * as http from "http";
 import {
   closePromise,
   createTransferAssertions,
-  readConfigV1,
+  readConfigV1AndNormalize,
   requestWithoutKeepAlive,
   servePromise
 } from "./test-utils";
-import {ConfigV1} from "../src/config/v1";
 import * as pipingVersion from "piping-server/dist/src/version";
+import {type NormalizedConfig} from "../src/config/normalized-config";
 
 describe("Rich Piping Server (config v1)", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
-  let configRef: { ref?: ConfigV1 } = { };
+  let configRef: { ref?: NormalizedConfig } = { };
 
   beforeEach(async () => {
     const serve = await servePromise();
@@ -36,7 +36,7 @@ describe("Rich Piping Server (config v1)", () => {
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
-    configRef.ref = readConfigV1(`
+    configRef.ref = readConfigV1AndNormalize(`
       version: "1"
       config_for: rich_piping_server
 
@@ -47,7 +47,7 @@ describe("Rich Piping Server (config v1)", () => {
 
   it("should transfer with regular expression", async () => {
     // language=yaml
-    configRef.ref = readConfigV1(`
+    configRef.ref = readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -62,7 +62,7 @@ rejection: socket_close
 
   it("should transfer at only allowed path", async () => {
     // language=yaml
-    configRef.ref = readConfigV1(`
+    configRef.ref = readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -78,7 +78,7 @@ rejection: socket_close
   context("index", () => {
     it("should create a new index", async () => {
       // language=yaml
-      configRef.ref = readConfigV1(`
+      configRef.ref = readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -101,7 +101,7 @@ rejection: socket_close
 
     it("should create multiple indexes", async () => {
       // language=yaml
-      configRef.ref = readConfigV1(`
+      configRef.ref = readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -138,7 +138,7 @@ rejection: socket_close
 
   it("should reject with Nginx error page", async () => {
     // language=yaml
-    configRef.ref = readConfigV1(`
+    configRef.ref = readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -155,7 +155,7 @@ rejection: fake_nginx_down
 
   it("should reject with Nginx error page with Nginx version", async () => {
     // language=yaml
-    configRef.ref = readConfigV1(`
+    configRef.ref = readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -174,7 +174,7 @@ rejection:
 
   it("should transfer with basic auth", async () => {
     // language=yaml
-    configRef.ref = readConfigV1(`
+    configRef.ref = readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 

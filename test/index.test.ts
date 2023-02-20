@@ -3,17 +3,17 @@ import * as http from "http";
 import {
   closePromise,
   createTransferAssertions,
-  readConfigWithoutVersionAndMigrateToV1,
+  readConfigWithoutVersionAndMigrateToV1AndNormalize,
   requestWithoutKeepAlive,
   servePromise
 } from "./test-utils";
-import {ConfigV1} from "../src/config/v1";
+import {type NormalizedConfig} from "../src/config/normalized-config";
 
 describe("Rich Piping Server", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
-  let configRef: { ref?: ConfigV1 } = { };
+  let configRef: { ref?: NormalizedConfig } = { };
 
   beforeEach(async () => {
     const serve = await servePromise();
@@ -35,7 +35,7 @@ describe("Rich Piping Server", () => {
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - type: regexp
     value: "/.*"
@@ -46,7 +46,7 @@ rejection: socket-close
 
   it("should transfer at only allowed path", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - /myallowedpath1
 rejection: socket-close
@@ -57,7 +57,7 @@ rejection: socket-close
 
   it("should reject with Nginx error page", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - /myallowedpath1
 rejection: nginx-down
@@ -71,7 +71,7 @@ rejection: nginx-down
 
   it("should reject with Nginx error page with Nginx version", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - /myallowedpath1
 rejection:
@@ -87,7 +87,7 @@ rejection:
 
   it("should transfer with basic auth", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.ref = readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 basicAuthUsers:
   - username: user1
     password: pass1234
