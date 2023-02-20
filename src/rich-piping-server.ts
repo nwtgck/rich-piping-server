@@ -5,6 +5,7 @@ import * as basicAuth from "basic-auth";
 
 import {fakeNginxResponse} from "./fake-nginx-response";
 import {type NormalizedConfig} from "./config/normalized-config";
+import * as log4js from "log4js";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
@@ -47,11 +48,12 @@ function basicAuthDenied(res: HttpRes) {
   res.end("Access denied\n");
 }
 
-export function generateHandler({pipingServer, configRef, useHttps}: {pipingServer: PipingServer, configRef: {ref?: NormalizedConfig | undefined}, useHttps: boolean}): Handler {
+export function generateHandler({pipingServer, configRef, logger, useHttps}: {pipingServer: PipingServer, configRef: {ref?: NormalizedConfig | undefined}, logger?: log4js.Logger, useHttps: boolean}): Handler {
   const pipingHandler = pipingServer.generateHandler(useHttps);
   return (req, res) => {
     const config = configRef.ref;
     if (config === undefined) {
+      logger?.error("requested but config not loaded");
       req.socket.end();
       return;
     }

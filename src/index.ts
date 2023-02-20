@@ -167,7 +167,7 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
 // Create a piping server
   const pipingServer = new piping.Server({logger});
 
-  http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
+  http.createServer(generateHandler({pipingServer, configRef, logger, useHttps: false}))
     .listen({ host, port: httpPort }, () => {
       logger.info(`Listen HTTP on ${httpPort}...`);
     });
@@ -195,7 +195,7 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
         ...generateSecureContextOptions(),
         allowHTTP1: true
       },
-      generateHandler({pipingServer, configRef, useHttps: true})
+      generateHandler({pipingServer, configRef, logger, useHttps: true})
     );
     const updateSecureContext = () => {
       try {
