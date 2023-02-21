@@ -10,6 +10,9 @@ import * as yargs from "yargs";
 import { z } from "zod";
 import * as yaml from "js-yaml";
 import * as piping from "piping-server";
+import * as Babel from "@babel/standalone";
+// @ts-ignore
+import babelPluginTransformModulesCommonJs from "@babel/plugin-transform-modules-commonjs";
 
 import {generateHandler} from "./rich-piping-server";
 import {configWihtoutVersionSchema} from "./config/without-version";
@@ -46,14 +49,14 @@ const parser = yargs
     type: "string"
   })
   .option('config-path', {
-    describe: "Config YAML path",
+    describe: "Config path",
     type: "string",
     required: true,
   })
   .alias("config-path", "config-yaml-path")
   .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
-    const configYaml = yaml.load(fs.readFileSync(argv.configPath, 'utf8'));
+    const configYaml = loadConfig(argv.configPath);
     if (configV1Schema.safeParse(configYaml).success) {
       console.log("The config is already a valid config v1");
       return;
@@ -72,6 +75,7 @@ const parser = yargs
       process.exit(1);
     }
     const configV1 = migrateToConfigV1(configParsed.data);
+    // TODO: support .js migration
     console.log(yaml.dump(configV1));
   });
 
@@ -112,21 +116,44 @@ function logZodError<T>(zodError: z.ZodError<T>) {
   }
 }
 
-function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): void {
+export function loadConfigJs(configJs: string): unknown {
+  const {code} = Babel.transform(configJs, {
+    plugins: [ babelPluginTransformModulesCommonJs ],
+  });
+  if (code === null || code === undefined) {
+    throw new Error("code is null or undefined");
+  }
+  const configExports: { default?: unknown } = {};
+  new Function("exports", code)(configExports);
+  return configExports.default;
+}
+
+function loadConfig(configPath: string): unknown {
+  const fileContent = fs.readFileSync(configPath, 'utf8');
+  if (configPath.endsWith(".js")) {
+    return loadConfigJs(fileContent);
+  }
+  if (configPath.endsWith(".yaml") || configPath.endsWith(".yml")) {
+    return yaml.load(fileContent)
+  }
+  throw Error("config path should be .js or .yaml");
+}
+
+function loadAndUpdateConfig(logger: log4js.Logger, configPath: string): void {
   // Load config
-  logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
+  logger.info(`Loading ${JSON.stringify(configPath)}...`);
   try {
-    const configYaml = yaml.load(fs.readFileSync(configYamlPath, 'utf8'));
+    const configJson = loadConfig(configPath);
     // NOTE: using configBasicSchema makes error message better
-    const configBasicParsed = configBasicSchema.safeParse(configYaml);
+    const configBasicParsed = configBasicSchema.safeParse(configJson);
     if (!configBasicParsed.success) {
       logZodError(configBasicParsed.error);
       return;
     }
     if (configBasicParsed.data.version === undefined) {
       logger.warn("config format is old");
-      logger.warn(`Migration guide: rich-piping-server --config-path=${configYamlPath} migrate-config`);
-      const configWithoutVersionParsed = configWihtoutVersionSchema.safeParse(configYaml);
+      logger.warn(`Migration guide: rich-piping-server --config-path=${configPath} migrate-config`);
+      const configWithoutVersionParsed = configWihtoutVersionSchema.safeParse(configJson);
       if (!configWithoutVersionParsed.success) {
         logZodError(configWithoutVersionParsed.error);
         return;
@@ -134,14 +161,14 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
       configRef.ref = normalizeConfigV1(migrateToConfigV1(configWithoutVersionParsed.data));
     }
     if (configBasicParsed.data.version === "1" || configBasicParsed.data.version === 1) {
-      const configParsed = configV1Schema.safeParse(configYaml);
+      const configParsed = configV1Schema.safeParse(configJson);
       if (!configParsed.success) {
         logZodError(configParsed.error);
         return;
       }
       configRef.ref = normalizeConfigV1(configParsed.data);
     }
-    logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
+    logger.info(`${JSON.stringify(configPath)} is loaded successfully`);
   } catch (err) {
     logger.error("Failed to load config", err);
   }
