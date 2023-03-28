@@ -29,7 +29,7 @@
     "@types/node": "^16.18.19",
     "@types/power-assert": "^1.5.8",
     "@types/useragent": "^2.3.1",
-    "@types/yargs": "^17.0.23",
+    "@types/yargs": "^17.0.24",
     "get-port": "^5.1.1",
     "mocha": "^10.2.0",
     "pkg": "^5.8.1",
