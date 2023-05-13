@@ -1,6 +1,6 @@
+import * as net from "net";
 import * as http from "http";
 import * as http2 from "http2";
-import * as getPort from "get-port";
 import * as piping from "piping-server";
 import * as richPipingServer from "../src/rich-piping-server";
 import * as log4js from "log4js";
@@ -13,13 +13,14 @@ import {URL, UrlObject} from "url";
 import * as assert from "power-assert";
 
 /**
- * Listen on the specified port
+ * Listen and return port
  * @param server
- * @param port
  */
-function listenPromise(server: http.Server | http2.Http2Server, port: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    server.listen(port, resolve);
+function listenPromise(server: http.Server | http2.Http2Server): Promise<number> {
+  return new Promise<number>((resolve) => {
+    server.listen(0, () => {
+      resolve((server.address() as net.AddressInfo).port);
+    });
   });
 }
 
@@ -36,10 +37,6 @@ export function closePromise(server: http.Server | http2.Http2Server): Promise<v
 export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: string, richPipingServerHttpServer: http.Server, configRef: { ref?: NormalizedConfig | undefined } }> {
   // Create a logger
   const logger = log4js.getLogger();
-  // Get available port
-  const pipingPort = await getPort();
-  // Define Piping URL
-  const pipingUrl = `http://localhost:${pipingPort}`;
   // Create a Piping server
   const pipingServer = new piping.Server({logger});
   const configRef: { ref?: NormalizedConfig | undefined } = { };
@@ -48,8 +45,10 @@ export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: s
     configRef,
     useHttps: false,
   }));
-  // Listen on the port
-  await listenPromise(richPipingServerHttpServer, pipingPort);
+  // Listen
+  const pipingPort = await listenPromise(richPipingServerHttpServer);
+  // Define Piping URL
+  const pipingUrl = `http://localhost:${pipingPort}`;
 
   return {
     pipingPort,
