@@ -57,24 +57,9 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
       req.socket.end();
       return;
     }
-    let allowedPathOrAlwaysAllowed: AllowPath | { type: "always_allowed" };
-    if (config.allow_paths === undefined) {
-      allowedPathOrAlwaysAllowed = { type: "always_allowed" };
-    } else {
-      const allowedPath = findAllowedPath(config.allow_paths, req);
-      if (req.url === undefined || allowedPath === undefined) {
-        if (config.rejection.type === 'socket_close') {
-          req.socket.end();
-          return;
-        }
-        if (config.rejection.type === "fake_nginx_down") {
-          fakeNginxResponse(res, config.rejection.nginx_version, req.headers["user-agent"] ?? "");
-          return;
-        }
-        // exhaustive check
-        throw Error(`unknown rejection type: ${(config.rejection as { type: never }).type}`);
-      }
-      allowedPathOrAlwaysAllowed = allowedPath;
+    const allowedPathOrAlwaysAllowed: AllowPath | { type: "always_allowed" } | { type: "rejected" } = getAllowedPathOrReject(config, req, res);
+    if ( allowedPathOrAlwaysAllowed.type === "rejected" ) {
+      return;
     }
     // Basic auth is enabled
     if (config.basic_auth_users !== undefined) {
@@ -104,4 +89,27 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
 
     pipingHandler(req, res);
   };
+}
+
+function getAllowedPathOrReject(config: NormalizedConfig, req: HttpReq, res: HttpRes): AllowPath | { type: "always_allowed" } | { type: "rejected" } {
+  let allowedPathOrAlwaysAllowed: AllowPath | { type: "always_allowed" };
+  if (config.allow_paths === undefined) {
+    allowedPathOrAlwaysAllowed = { type: "always_allowed" };
+  } else {
+    const allowedPath = findAllowedPath(config.allow_paths, req);
+    if (req.url === undefined || allowedPath === undefined) {
+      if (config.rejection.type === 'socket_close') {
+        req.socket.end();
+        return { type: "rejected" };
+      }
+      if (config.rejection.type === "fake_nginx_down") {
+        fakeNginxResponse(res, config.rejection.nginx_version, req.headers["user-agent"] ?? "");
+        return { type: "rejected" };
+      }
+      // exhaustive check
+      throw Error(`unknown rejection type: ${(config.rejection as { type: never }).type}`);
+    }
+    allowedPathOrAlwaysAllowed = allowedPath;
+  }
+  return allowedPathOrAlwaysAllowed;
 }
