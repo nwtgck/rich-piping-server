@@ -9,9 +9,40 @@ import * as log4js from "log4js";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
-type Handler = (req: HttpReq, res: HttpRes) => void;
+type RichPipingServer = (req: HttpReq, res: HttpRes) => void;
 
 type AllowPath = NonNullable<NormalizedConfig["allow_paths"]>[number];
+
+export function generateHandler({pipingServer, configRef, logger, useHttps}: {pipingServer: PipingServer, configRef: {ref?: NormalizedConfig | undefined}, logger?: log4js.Logger, useHttps: boolean}): RichPipingServer {
+  const pipingHandler = pipingServer.generateHandler(useHttps);
+  return (req, res) => {
+    const config = configRef.ref;
+    if (config === undefined) {
+      logger?.error("requested but config not loaded");
+      req.socket.end();
+      return;
+    }
+    const allowedPathOrAlwaysAllowed: AllowPath | { type: "always_allowed" } | { type: "rejected" } = getAllowedPathOrReject(config, req, res);
+    if ( allowedPathOrAlwaysAllowed.type === "rejected" ) {
+      return;
+    }
+    // Basic auth is enabled and denied
+    if (config.basic_auth_users !== undefined && handleBasicAuth(config.basic_auth_users, req, res) === "denied") {
+      return
+    }
+    // Rewrite path for index
+    // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
+    if (allowedPathOrAlwaysAllowed.type === "index") {
+      if (req.url === allowedPathOrAlwaysAllowed.value) {
+        req.url = "/";
+      } else {
+        req.url = req.url?.substring(allowedPathOrAlwaysAllowed.value.length);
+      }
+    }
+
+    pipingHandler(req, res);
+  };
+}
 
 function normalizePath(path: string): string {
   return path.endsWith("/") ? path : path + "/";
@@ -46,37 +77,6 @@ function basicAuthDenied(res: HttpRes) {
     'WWW-Authenticate': 'Basic realm="example"'
   });
   res.end("Access denied\n");
-}
-
-export function generateHandler({pipingServer, configRef, logger, useHttps}: {pipingServer: PipingServer, configRef: {ref?: NormalizedConfig | undefined}, logger?: log4js.Logger, useHttps: boolean}): Handler {
-  const pipingHandler = pipingServer.generateHandler(useHttps);
-  return (req, res) => {
-    const config = configRef.ref;
-    if (config === undefined) {
-      logger?.error("requested but config not loaded");
-      req.socket.end();
-      return;
-    }
-    const allowedPathOrAlwaysAllowed: AllowPath | { type: "always_allowed" } | { type: "rejected" } = getAllowedPathOrReject(config, req, res);
-    if ( allowedPathOrAlwaysAllowed.type === "rejected" ) {
-      return;
-    }
-    // Basic auth is enabled and denied
-    if (config.basic_auth_users !== undefined && handleBasicAuth(config.basic_auth_users, req, res) === "denied") {
-      return
-    }
-    // Rewrite path for index
-    // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
-    if (allowedPathOrAlwaysAllowed.type === "index") {
-      if (req.url === allowedPathOrAlwaysAllowed.value) {
-        req.url = "/";
-      } else {
-        req.url = req.url?.substring(allowedPathOrAlwaysAllowed.value.length);
-      }
-    }
-
-    pipingHandler(req, res);
-  };
 }
 
 function getAllowedPathOrReject(config: NormalizedConfig, req: HttpReq, res: HttpRes): AllowPath | { type: "always_allowed" } | { type: "rejected" } {
