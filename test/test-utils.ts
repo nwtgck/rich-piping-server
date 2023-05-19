@@ -11,6 +11,7 @@ import {NormalizedConfig, normalizeConfigV1} from "../src/config/normalized-conf
 import * as undici from "undici";
 import {URL, UrlObject} from "url";
 import * as assert from "power-assert";
+import {ConfigRef} from "../src/ConfigRef";
 
 /**
  * Listen and return port
@@ -34,12 +35,12 @@ export function closePromise(server: http.Server | http2.Http2Server): Promise<v
   });
 }
 
-export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: string, richPipingServerHttpServer: http.Server, configRef: { ref?: NormalizedConfig | undefined } }> {
+export async function servePromise(): Promise<{ pipingPort: number, pipingUrl: string, richPipingServerHttpServer: http.Server, configRef: ConfigRef }> {
   // Create a logger
   const logger = log4js.getLogger();
   // Create a Piping server
   const pipingServer = new piping.Server({logger});
-  const configRef: { ref?: NormalizedConfig | undefined } = { };
+  const configRef = new ConfigRef();
   const richPipingServerHttpServer = http.createServer(richPipingServer.generateHandler({
     pipingServer,
     configRef,
@@ -116,10 +117,10 @@ export function createTransferAssertions({getPipingUrl}: { getPipingUrl: () => s
 export function readConfigWithoutVersionAndMigrateToV1AndNormalize(yamlString: string): NormalizedConfig {
   const configYaml = yaml.load(yamlString);
   const configWithoutVersion = configWihtoutVersionSchema.parse(configYaml);
-  return normalizeConfigV1(migrateToConfigV1(configWithoutVersion));
+  return normalizeConfigV1(undefined, migrateToConfigV1(configWithoutVersion));
 }
 
 export function readConfigV1AndNormalize(yamlString: string): NormalizedConfig {
   const configYaml = yaml.load(yamlString);
-  return normalizeConfigV1(configV1Schema.parse(configYaml));
+  return normalizeConfigV1(undefined, configV1Schema.parse(configYaml));
 }

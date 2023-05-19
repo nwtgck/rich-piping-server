@@ -9,12 +9,13 @@ import {
 } from "./test-utils";
 import * as pipingVersion from "piping-server/dist/src/version";
 import {type NormalizedConfig} from "../src/config/normalized-config";
+import {ConfigRef} from "../src/ConfigRef";
 
 describe("Rich Piping Server (config v1)", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
-  let configRef: { ref?: NormalizedConfig } = { };
+  let configRef: ConfigRef = new ConfigRef();
 
   beforeEach(async () => {
     const serve = await servePromise();
@@ -36,25 +37,25 @@ describe("Rich Piping Server (config v1)", () => {
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
-    configRef.ref = readConfigV1AndNormalize(`
+    configRef.set(readConfigV1AndNormalize(`
       version: "1"
       config_for: rich_piping_server
 
       rejection: socket_close
-    `);
+    `));
     await shouldTransfer({path: "/mypath1"});
   });
 
   it("should transfer with regular expression", async () => {
     // language=yaml
-    configRef.ref = readConfigV1AndNormalize(`
+    configRef.set(readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
 allow_paths:
   - regexp: "^/[a-c]+"
 rejection: socket_close
-`);
+`));
     await shouldTransfer({path: "/aabbcc"});
     await shouldTransfer({path: "/abchoge"});
     await shouldNotTransferAndSocketClosed({path: "/hoge"});
@@ -62,14 +63,14 @@ rejection: socket_close
 
   it("should transfer at only allowed path", async () => {
     // language=yaml
-    configRef.ref = readConfigV1AndNormalize(`
+    configRef.set(readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
 allow_paths:
   - /myallowedpath1
 rejection: socket_close
-`);
+`));
     await shouldTransfer({path: "/myallowedpath1" });
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
     await shouldNotTransferAndSocketClosed({path: "/myallowedpath1/path1"});
@@ -78,14 +79,14 @@ rejection: socket_close
   context("index", () => {
     it("should create a new index", async () => {
       // language=yaml
-      configRef.ref = readConfigV1AndNormalize(`
+      configRef.set(readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
 allow_paths:
   - index: /myindex1
 rejection: socket_close
-`);
+`));
       await shouldTransfer({path: "/myindex1/path1" });
       // Should respond simple Web UI
       {
@@ -101,7 +102,7 @@ rejection: socket_close
 
     it("should create multiple indexes", async () => {
       // language=yaml
-      configRef.ref = readConfigV1AndNormalize(`
+      configRef.set(readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -109,7 +110,7 @@ allow_paths:
   - index: /myindex1
   - index: /myindex2
 rejection: socket_close
-`);
+`));
       await shouldTransfer({path: "/myindex1/path1" });
       // Should respond simple Web UI
       {
@@ -138,14 +139,14 @@ rejection: socket_close
 
   it("should reject with Nginx error page", async () => {
     // language=yaml
-    configRef.ref = readConfigV1AndNormalize(`
+    configRef.set(readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
 allow_paths:
   - /myallowedpath1
 rejection: fake_nginx_down
-`);
+`));
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
     const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
@@ -155,7 +156,7 @@ rejection: fake_nginx_down
 
   it("should reject with Nginx error page with Nginx version", async () => {
     // language=yaml
-    configRef.ref = readConfigV1AndNormalize(`
+    configRef.set(readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -164,7 +165,7 @@ allow_paths:
 rejection:
   fake_nginx_down:
     nginx_version: 99.9.9
-`);
+`));
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
     const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
@@ -174,7 +175,7 @@ rejection:
 
   it("should transfer with basic auth", async () => {
     // language=yaml
-    configRef.ref = readConfigV1AndNormalize(`
+    configRef.set(readConfigV1AndNormalize(`
 version: "1"
 config_for: rich_piping_server
 
@@ -184,7 +185,7 @@ basic_auth_users:
 allow_paths:
   - /myallowedpath1
 rejection: socket_close
-`);
+`));
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
     await shouldTransfer({
       path: "/myallowedpath1",
