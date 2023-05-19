@@ -61,21 +61,9 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
     if ( allowedPathOrAlwaysAllowed.type === "rejected" ) {
       return;
     }
-    // Basic auth is enabled
-    if (config.basic_auth_users !== undefined) {
-      const user = basicAuth(req);
-      if (user === undefined) {
-        basicAuthDenied(res);
-        return;
-      }
-      const {name, pass} = user;
-      const allowsUser = config.basic_auth_users.some(({username, password}) =>
-        username === name && password === pass
-      );
-      if (!allowsUser) {
-        basicAuthDenied(res);
-        return;
-      }
+    // Basic auth is enabled and denied
+    if (config.basic_auth_users !== undefined && handleBasicAuth(config.basic_auth_users, req, res) === "denied") {
+      return
     }
     // Rewrite path for index
     // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path
@@ -112,4 +100,21 @@ function getAllowedPathOrReject(config: NormalizedConfig, req: HttpReq, res: Htt
     allowedPathOrAlwaysAllowed = allowedPath;
   }
   return allowedPathOrAlwaysAllowed;
+}
+
+function handleBasicAuth(basicAuthUsers: NonNullable<NormalizedConfig["basic_auth_users"]>, req: HttpReq, res: HttpRes): "allowed" | "denied" {
+  const user = basicAuth(req);
+  if (user === undefined) {
+    basicAuthDenied(res);
+    return "denied";
+  }
+  const {name, pass} = user;
+  const allowsUser = basicAuthUsers.some(({username, password}) =>
+    username === name && password === pass
+  );
+  if (!allowsUser) {
+    basicAuthDenied(res);
+    return "denied";
+  }
+  return "allowed"
 }
