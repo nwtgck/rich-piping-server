@@ -22,8 +22,8 @@ export class ConfigRef {
       };
       if (JSON.stringify(params) !== JSON.stringify(this.previousGenerateOpenIdClientParams)) {
         this.cachedOpenidClientPromise = generateOpenIdClient(params);
+        this.previousGenerateOpenIdClientParams = params;
       }
-      this.previousGenerateOpenIdClientParams = params;
     }
   }
 
