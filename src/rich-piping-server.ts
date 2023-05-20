@@ -2,7 +2,6 @@ import * as http from "http";
 import * as http2 from "http2";
 import {Server as PipingServer} from "piping-server";
 import * as basicAuth from "basic-auth";
-import * as cookie from "cookie";
 
 import {fakeNginxResponse} from "./fake-nginx-response";
 import {type NormalizedConfig} from "./config/normalized-config";
@@ -10,6 +9,7 @@ import * as log4js from "log4js";
 import * as openidClient from "openid-client";
 import {ConfigRef} from "./ConfigRef";
 import {OpenIdConnectUserStore} from "./OpenIdConnectUserStore";
+import {handleOpenIdConnect} from "./openid-connect";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
@@ -38,74 +38,24 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
       return
     }
     if (config.openid_connect !== undefined) {
-      // Always set because config may be hot reloaded
-      openIdConnectUserStore.setAgeSeconds(config.openid_connect.session.age_seconds);
-      const url = new URL(req.url!, `http://${req.headers.host}`);
-      const client = await configRef.openidClientPromise!;
-      if (url.pathname === config.openid_connect.redirect.path) {
-        const params = client.callbackParams(req);
-        let returnUrl: string | undefined;
-        try {
-          returnUrl = JSON.parse(params.state ?? "").return_url;
-        } catch {
-
-        }
-        try {
-          const tokenSet = await client.callback(config.openid_connect.redirect.uri, params, {
-            state: params.state,
-            code_verifier: codeVerifier,
-          });
-          if (tokenSet.access_token === undefined) {
-            res.writeHead(400);
-            res.end("Access token not set\n");
-            return;
-          }
-          const userinfo = await client.userinfo(tokenSet.access_token);
-          const allowedUserinfo = config.openid_connect.allow_userinfos.find(u => {
-            return "sub" in u && u.sub === userinfo.sub || "email" in u && u.email === userinfo.email;
-          });
-          if (allowedUserinfo === undefined) {
-            res.writeHead(400, {"Content-Type": "text/plain"});
-            res.end(`NOT allowed user\n`);
-          } else {
-            const newSessionId = openIdConnectUserStore.setUserinfo(userinfo);
-            const setCookieValue = cookie.serialize(config.openid_connect.session.cookie.name, newSessionId, {
-              httpOnly: config.openid_connect.session.cookie.http_only,
-              maxAge: config.openid_connect.session.age_seconds,
-            })
-            res.writeHead(200, {
-              "Content-Type": "text/html",
-              "Set-Cookie": setCookieValue,
-            });
-            if (returnUrl === undefined) {
-              res.end(`allowed: ${JSON.stringify(userinfo)}\n`);
-            } else {
-              // TODO: XSS OK?
-              res.end(`<html><head><meta http-equiv="refresh" content=0;url=${JSON.stringify(returnUrl)}></head></html>`);
-            }
-          }
-        } catch (err: unknown) {
-          logger?.info(err);
-          res.writeHead(400);
-          res.end();
-        }
-        return;
-      }
-      const parsedCookie = cookie.parse(req.headers.cookie ?? "");
-      const sessionId: string | undefined = parsedCookie[config.openid_connect.session.cookie.name];
-      if (sessionId === undefined || !openIdConnectUserStore.isValidSessionId(sessionId)) {
-        // Start authorization request
-        const authorizationUrl = client.authorizationUrl({
-          scope: "openid email",
-          code_challenge: codeChallenge,
-          code_challenge_method: 'S256',
-          state: JSON.stringify({
-            return_url: new URL(req.url!, `http://${req.headers["x-forwarded-for"] ?? req.headers.host}`),
-          }),
-        });
-        res.writeHead(302, {Location: authorizationUrl});
-        res.end();
-        return;
+      const result: "authorized" | "responded" = await handleOpenIdConnect({
+        logger,
+        openIdClient: await configRef.openidClientPromise!,
+        codeVerifier,
+        codeChallenge,
+        openIdConnectUserStore,
+        openidConnectConfig: config.openid_connect,
+        req,
+        res,
+      });
+      switch (result) {
+        case "responded":
+          return;
+        case "authorized":
+          break;
+        default:
+          const exhaustiveCheck: never = result;
+          throw new Error(`unexpected result: ${exhaustiveCheck}`);
       }
     }
     // Rewrite path for index
