@@ -72,12 +72,12 @@ Here is an example.
 ...
 
 basic_auth_users:
-  - username: !env "USER_NAME1"
+  - username: !env "USERNAME1"
     password: !env "PASSWORD1"
 ...
 ```
 
-`!unrecommended_js` is not recommended to use because this behavior highly depends on underlying the runtime and the behavior may change. 
+`!unrecommended_js` is not recommended to use because this behavior highly depends on the underlying runtime and the behavior may change. 
 
 ### OpenID Connect
 
