@@ -16,9 +16,10 @@ export class OpenIdConnectUserStore {
       ...userInfo,
       createdAt: new Date(),
     });
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       this.sessionIdToUserInfo.delete(sessionId);
     }, this.ageSeconds * 1000);
+    timer.unref();
     return sessionId;
   }
 

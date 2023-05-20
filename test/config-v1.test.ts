@@ -8,8 +8,12 @@ import {
   servePromise
 } from "./test-utils";
 import * as pipingVersion from "piping-server/dist/src/version";
-import {type NormalizedConfig} from "../src/config/normalized-config";
 import {ConfigRef} from "../src/ConfigRef";
+import * as getPort from "get-port";
+import {serveOpenIdProvider} from "./serve-openid-provider";
+import axios from 'axios';
+import * as axiosCookieJarSupport from 'axios-cookiejar-support';
+import { CookieJar } from 'tough-cookie';
 
 describe("Rich Piping Server (config v1)", () => {
   let richPipingServerHttpServer: http.Server;
@@ -193,5 +197,66 @@ rejection: socket_close
         "Authorization": `Basic ${Buffer.from("user1:pass1234").toString("base64")}`,
       },
     });
+  });
+
+  it("should transfer with OpenID Connect", async () => {
+    const clientId = "myclientid";
+    const clientSecret = "thisissecret";
+    const issuerPort = await getPort();
+    const issuerUrl = `http://localhost:${issuerPort}`;
+
+    const providerServer = await serveOpenIdProvider({
+      port: issuerPort,
+      clientId,
+      clientSecret,
+      redirectUri: `${pipingUrl}/my_callback`,
+    });
+
+    const sessionCookieName = "my_session_id"
+    // language=yaml
+    configRef.set(readConfigV1AndNormalize(`
+version: "1"
+config_for: rich_piping_server
+
+experimental_openid_connect: true
+openid_connect:
+  issuer_url: ${issuerUrl}
+  client_id: ${clientId}
+  client_secret: ${clientSecret}
+  redirect:
+    uri: ${pipingUrl}/my_callback
+    path: /my_callback
+  allow_userinfos:
+    - sub: user001
+  session:
+    cookie:
+      name: ${sessionCookieName}
+      http_only: true
+    age_seconds: 60
+
+rejection: socket_close
+`));
+
+    const cookieJar = new CookieJar();
+    const axiosClient = axiosCookieJarSupport.wrapper(axios.create({ jar: cookieJar }));
+    const res1 = await axiosClient.get(pipingUrl);
+    assert(res1.request.res.responseUrl.startsWith(`${issuerUrl}/interaction/`));
+    // NOTE: login should be "user001", any password is OK
+    const res2 = await axiosClient.post(`${res1.request.res.responseUrl}/login`,  "login=user001&password=dummypass");
+    assert(res2.request.res.responseUrl.startsWith(`${issuerUrl}/interaction/`));
+    const res3 = await axiosClient.post(`${res2.request.res.responseUrl}/confirm`);
+    assert(res3.request.res.responseUrl.startsWith(`${pipingUrl}/my_callback?code=`));
+    const cookie = cookieJar.toJSON().cookies.find(c => c.key === sessionCookieName)!;
+    assert.strictEqual(cookie.domain, "localhost");
+    assert.strictEqual(cookie.httpOnly, true);
+
+    await shouldTransfer({
+      path: "/mypath",
+      headers: {
+        "Cookie": `${sessionCookieName}=${cookie.value}`,
+      },
+    });
+
+    providerServer.close();
   });
 });
