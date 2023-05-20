@@ -13,9 +13,11 @@ import * as piping from "piping-server";
 
 import {generateHandler} from "./rich-piping-server";
 import {configWihtoutVersionSchema} from "./config/without-version";
-import {ConfigV1, configV1Schema, migrateToConfigV1} from "./config/v1";
+import {configV1Schema, migrateToConfigV1} from "./config/v1";
+import {normalizeConfigV1} from "./config/normalized-config";
 import {configBasicSchema} from "./config/basic";
-
+import {ConfigRef} from "./ConfigRef";
+import {customYamlLoad} from "./custom-yaml-load";
 
 // Create option parser
 const parser = yargs
@@ -52,7 +54,7 @@ const parser = yargs
   .alias("config-path", "config-yaml-path")
   .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
-    const configYaml = yaml.load(fs.readFileSync(argv.configPath, 'utf8'));
+    const configYaml = customYamlLoad(fs.readFileSync(argv.configPath, 'utf8'));
     if (configV1Schema.safeParse(configYaml).success) {
       console.log("The config is already a valid config v1");
       return;
@@ -77,7 +79,7 @@ const parser = yargs
 
 // Parse arguments
 const args = parser.parseSync(process.argv.slice(2));
-const configRef: {ref?: ConfigV1} = { };
+const configRef: ConfigRef = new ConfigRef();
 // Create a logger
 const logger = log4js.getLogger();
 logger.level = "info";
@@ -115,7 +117,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
   try {
-    const configYaml = yaml.load(fs.readFileSync(configYamlPath, 'utf8'));
+    const configYaml = customYamlLoad(fs.readFileSync(configYamlPath, 'utf8'));
     // NOTE: using configBasicSchema makes error message better
     const configBasicParsed = configBasicSchema.safeParse(configYaml);
     if (!configBasicParsed.success) {
@@ -130,7 +132,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
         logZodError(configWithoutVersionParsed.error);
         return;
       }
-      configRef.ref = migrateToConfigV1(configWithoutVersionParsed.data);
+      configRef.set(normalizeConfigV1(logger, migrateToConfigV1(configWithoutVersionParsed.data)));
     }
     if (configBasicParsed.data.version === "1" || configBasicParsed.data.version === 1) {
       const configParsed = configV1Schema.safeParse(configYaml);
@@ -138,7 +140,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
         logZodError(configParsed.error);
         return;
       }
-      configRef.ref = configParsed.data;
+      configRef.set(normalizeConfigV1(logger, configParsed.data));
     }
     logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
   } catch (err) {
@@ -155,18 +157,18 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
   serverCrtPath: string | undefined,
   configYamlPath: string,
 }) {
-// Load config
+  // Load config
   loadAndUpdateConfig(logger, configYamlPath);
 
-// Watch config yaml
+  // Watch config yaml
   fs.watch(configYamlPath, () => {
     loadAndUpdateConfig(logger, configYamlPath);
   });
 
-// Create a piping server
+  // Create a piping server
   const pipingServer = new piping.Server({logger});
 
-  http.createServer(generateHandler({pipingServer, configRef, useHttps: false}))
+  http.createServer(generateHandler({pipingServer, configRef, logger, useHttps: false}))
     .listen({ host, port: httpPort }, () => {
       logger.info(`Listen HTTP on ${httpPort}...`);
     });
@@ -194,7 +196,7 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
         ...generateSecureContextOptions(),
         allowHTTP1: true
       },
-      generateHandler({pipingServer, configRef, useHttps: true})
+      generateHandler({pipingServer, configRef, logger, useHttps: true})
     );
     const updateSecureContext = () => {
       try {
@@ -211,7 +213,7 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
     });
   }
 
-// Catch and ignore error
+  // Catch and ignore error
   process.on("uncaughtException", (err) => {
     logger.error("on uncaughtException", err);
   });

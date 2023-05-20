@@ -27,10 +27,10 @@ allow_paths:
   # Create multiple "index".
   - index: /mytop2
 
-# Respond a fake nginx 500 down page when rejected
+# Respond a fake nginx 500 down page when path not allowed
 rejection: fake_nginx_down
 
-# Close socket when rejected
+# Close socket when path not allowed
 #rejection: socket_close
 
 # Respond a fake nginx 500 down with version
@@ -58,6 +58,144 @@ Here are some example results of the server with the config.
 - Web UI because of "index": `curl -u user1:pass1234 http://localhost:8080/mytop2/`
 - reject because path is not allowed: `curl -u user1:pass1234 http://localhost:8080/`
 - reject because of no basic auth: `curl http://localhost:8080/0s6twklxkrcfs1u`
+
+### Tags
+
+These tags are available in config.
+- `!env MY_VALUE1`
+- `!concat [ "hello", !env "MY_VALUE1" ]`
+- `!unrecommended_js "return new Date().getMonth() < 5"`
+
+Here is an example.
+
+```yaml
+...
+
+basic_auth_users:
+  - username: !env "USERNAME1"
+    password: !env "PASSWORD1"
+...
+```
+
+`!unrecommended_js` is not recommended to use because this behavior highly depends on the underlying runtime and the behavior may change. 
+
+### OpenID Connect
+
+This is an experimental feature and it may have breaking changes.
+
+```yaml
+version: '1'
+config_for: rich_piping_server
+
+# OpenID Connect is experimental
+experimental_openid_connect: true
+
+# optional
+openid_connect:
+  issuer_url: https://example.com
+  client_id: <your client id here>
+  client_secret: <your client secret here>
+  redirect:
+    # Rich Piping Server callback URL
+    uri: https://your_rich_piping_server/callback
+    path: /callback
+  allow_userinfos:
+    - sub: auth0|0123456789abcdef01234567
+    - email: johnsmith@example.com
+  # Session ID is generated after authentication successful and user in "allow_userinfos"
+  # Shutting down Rich Piping Server revokes all sessions for now
+  session:
+    cookie:
+      name: my_session_id
+      http_only: true
+    # optional (useful especially for command line tools to get session ID)
+    forward:
+      # A CLI may server an ephemeral HTTP server on :65106 and open https://your_rich_piping_server/?my_session_forward_url=http://localhost:65106
+      # The opened browser will POST http://localhost:65106 with `{ "session_id": "..." }` after logged in.
+      query_param_name: my_session_forward_url
+      allow_url_regexp: ^http://localhost:\d+.*$
+    age_seconds: 86400
+
+# Close socket when path not allowed
+rejection: socket_close
+```
+
+<details>
+<summary>Example CLI to get session ID in Node.js</summary>
+
+```js
+const http = require("http");
+
+(async () => {
+  const richPipingServerUrl = "https://your_rich_piping_server";
+  const sessionId = await getSessionId(richPipingServerUrl);
+  console.log("sessionId:", sessionId);
+  // (you can use session ID now save to ~/.config/... or something)
+
+  // Example to access the Rich Piping Server
+  const res = await fetch(`${richPipingServerUrl}/version`, {
+    headers: { "Cookie": `my_session_id=${sessionId}` }
+  });
+  console.log("Underlying Piping Server version:", await res.text());
+})();
+
+// Open default browser and get session ID
+function getSessionId(richPipingServerUrl) {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      if (req.method === "OPTIONS") {
+        res.writeHead(200, {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+          // Private Network Access preflights: https://developer.chrome.com/blog/private-network-access-preflight/
+          ...(req.headers["access-control-request-private-network"] === "true" ? {
+            "Access-Control-Allow-Private-Network": "true",
+          }: {}),
+          "Access-Control-Max-Age": 86400,
+          "Content-Length": 0
+        });
+        res.end();
+        return;
+      }
+      if (req.method === "POST") {
+        let body = "";
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          res.writeHead(200, {
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end();
+          try {
+            const sessionId = JSON.parse(body).session_id;
+            resolve(sessionId);
+          } catch (err) {
+            reject(err);
+          }
+          server.close();
+        });
+        req.on("error", (err) => {
+          server.close();
+          reject(err);
+        });
+      }
+    });
+    server.listen(0, () => {
+      // This ephemeral server is session forward URL
+      const sessionForwardUrl = `http://localhost:${server.address().port}`;
+      const serverUrl = new URL(richPipingServerUrl);
+      serverUrl.searchParams.set("my_session_forward_url", sessionForwardUrl);
+      // Open the browser
+      // NOTE: This is only for macOS. Use other command for Windows, Linux
+      require("child_process").execSync(`open ${serverUrl.href}`);
+      // Use `npm install open` and `open(serverUrl.href)`
+    });
+  });
+}
+```
+</details>
 
 ### Run on Docker
 

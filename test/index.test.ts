@@ -3,17 +3,17 @@ import * as http from "http";
 import {
   closePromise,
   createTransferAssertions,
-  readConfigWithoutVersionAndMigrateToV1,
+  readConfigWithoutVersionAndMigrateToV1AndNormalize,
   requestWithoutKeepAlive,
   servePromise
 } from "./test-utils";
-import {ConfigV1} from "../src/config/v1";
+import {ConfigRef} from "../src/ConfigRef";
 
 describe("Rich Piping Server", () => {
   let richPipingServerHttpServer: http.Server;
   let pipingPort: number;
   let pipingUrl: string;
-  let configRef: { ref?: ConfigV1 } = { };
+  let configRef: ConfigRef = new ConfigRef();
 
   beforeEach(async () => {
     const serve = await servePromise();
@@ -35,33 +35,33 @@ describe("Rich Piping Server", () => {
 
   it("should transfer when all path allowed", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.set(readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - type: regexp
     value: "/.*"
 rejection: socket-close
-`);
+`));
     await shouldTransfer({path: "/mypath1"});
   });
 
   it("should transfer at only allowed path", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.set(readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - /myallowedpath1
 rejection: socket-close
-`);
+`));
     await shouldTransfer({path: "/myallowedpath1" });
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
   });
 
   it("should reject with Nginx error page", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.set(readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - /myallowedpath1
 rejection: nginx-down
-`);
+`));
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
     const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
@@ -71,13 +71,13 @@ rejection: nginx-down
 
   it("should reject with Nginx error page with Nginx version", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.set(readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 allowPaths:
   - /myallowedpath1
 rejection:
   type: nginx-down
   nginxVersion: 99.9.9
-`);
+`));
     await shouldTransfer({path: "/myallowedpath1" });
     // Get request promise
     const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath1`);
@@ -87,14 +87,14 @@ rejection:
 
   it("should transfer with basic auth", async () => {
     // language=yaml
-    configRef.ref = readConfigWithoutVersionAndMigrateToV1(`
+    configRef.set(readConfigWithoutVersionAndMigrateToV1AndNormalize(`
 basicAuthUsers:
   - username: user1
     password: pass1234
 allowPaths:
   - /myallowedpath1
 rejection: socket-close
-`);
+`));
     await shouldNotTransferAndSocketClosed({path: "/mypath1"});
     await shouldTransfer({
       path: "/myallowedpath1",

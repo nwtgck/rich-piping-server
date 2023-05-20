@@ -36,6 +36,33 @@ export const configV1Schema = z.object({
       }),
     }),
   ]),
+  experimental_openid_connect: z.optional(z.boolean()),
+  openid_connect: z.optional(z.object({
+    issuer_url: z.string(),
+    client_id: z.string(),
+    client_secret: z.string(),
+    redirect: z.object({
+      uri: z.string(),
+      path: z.string(),
+    }),
+    allow_userinfos: z.array(
+      z.union([
+        z.object({ sub: z.string() }),
+        z.object({ email: z.string() }),
+      ]),
+    ),
+    session: z.object({
+      forward: z.optional(z.object({
+        query_param_name: z.string(),
+        allow_url_regexp: z.string(),
+      })),
+      cookie: z.object({
+        name: z.string(),
+        http_only: z.boolean(),
+      }),
+      age_seconds: z.number(),
+    }),
+  })),
 });
 export type ConfigV1 = z.infer<typeof configV1Schema>;
 
@@ -66,5 +93,7 @@ export function migrateToConfigV1(c: ConfigWithoutVersion): ConfigV1 {
         },
       };
     })(),
+    experimental_openid_connect: false,
+    openid_connect: undefined,
   };
 }
