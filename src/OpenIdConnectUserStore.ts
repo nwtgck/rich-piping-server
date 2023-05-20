@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 
-type Userinfo = { sub?: string, email?: string }
+type Userinfo = { sub?: string, email?: string, email_verified?: boolean }
 
 export class OpenIdConnectUserStore {
   private ageSeconds: number = 0;

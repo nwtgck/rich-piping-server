@@ -71,9 +71,21 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   return "authorized";
 }
 
-function userinfoIsAllowed(allowUserinfos: OidcConfig["allow_userinfos"], userinfo: { sub?: string, email?: string }): boolean {
+function userinfoIsAllowed(allowUserinfos: OidcConfig["allow_userinfos"], userinfo: { sub?: string, email?: string, email_verified?: boolean }): boolean {
   const allowedUserinfo = allowUserinfos.find(u => {
-    return "sub" in u && u.sub === userinfo.sub || "email" in u && u.email === userinfo.email;
+    if ("sub" in u) {
+      return u.sub === userinfo.sub;
+    }
+    if ("email" in u) {
+      if (u.email !== userinfo.email) {
+        return false;
+      }
+      if (u.require_verification ?? true) {
+        return userinfo.email_verified ?? false;
+      }
+      return true;
+    }
+    return false;
   });
   return allowedUserinfo !== undefined;
 }

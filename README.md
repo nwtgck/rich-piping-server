@@ -102,6 +102,8 @@ openid_connect:
   allow_userinfos:
     - sub: auth0|0123456789abcdef01234567
     - email: johnsmith@example.com
+    - email: alice@example.com
+      require_verification: false
   # Session ID is generated after authentication successful and user in "allow_userinfos"
   # Shutting down Rich Piping Server revokes all sessions for now
   session:

@@ -48,7 +48,10 @@ export const configV1Schema = z.object({
     allow_userinfos: z.array(
       z.union([
         z.object({ sub: z.string() }),
-        z.object({ email: z.string() }),
+        z.object({
+          email: z.string(),
+          require_verification: z.optional(z.boolean()),
+        }),
       ]),
     ),
     session: z.object({
