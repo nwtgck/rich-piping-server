@@ -13,7 +13,7 @@ type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 
 const oidcStateScheme = z.object({
-  return_url: z.string(),
+  return_to: z.string(),
   session_forward_url: z.optional(z.string()),
 });
 
@@ -80,11 +80,8 @@ function userinfoIsAllowed(allowUserinfos: NonNullable<NormalizedConfig["openid_
 // usually go to login page
 function startAuthorization(useHttps: boolean, client: openidClient.BaseClient, codeChallenge: string, oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>, req: HttpReq, res: HttpRes) {
   const url = new URL(req.url!, `http://${req.headers.host}`);
-  const originalProto = ((req.headers["x-forwarded-proto"] as string)?.split(",")[0] ?? (useHttps ? "https" : "http")).trim();
-  const originalHost = ((req.headers["x-forwarded-host"] as string)?.split(",")[0] ?? req.headers.host).trim();
-  const returnUrl = new URL(req.url!, `${originalProto}://${originalHost}`);
   const state: OidcState = {
-    return_url: returnUrl.href,
+    return_to: req.url!,
     ...(oidcConfig.session.forward === undefined ? {} : {
       session_forward_url: url.searchParams.get(oidcConfig.session.forward.query_param_name) ?? undefined
     }),
@@ -143,13 +140,14 @@ async function handleRedirect(logger: Logger | undefined, client: openidClient.B
       "Content-Type": "text/html",
       "Set-Cookie": setCookieValue,
     });
-    if (oidcState?.return_url === undefined) {
+    if (oidcState?.return_to === undefined) {
       res.end(`allowed: ${JSON.stringify(userinfo)}\n`);
     } else {
+      // HTML meta redirection for Set-Cookie
       res.end(renderToString(
         <html>
         <head>
-          <meta http-equiv="refresh" content={`0;${oidcState.return_url}`}></meta>
+          <meta http-equiv="refresh" content={`0;${oidcState.return_to}`}></meta>
         </head>
         </html>
       ));

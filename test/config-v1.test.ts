@@ -240,7 +240,7 @@ rejection: socket_close
 
       const cookieJar = new CookieJar();
       const axiosClient = axiosCookieJarSupport.wrapper(axios.create({ jar: cookieJar }));
-      const res1 = await axiosClient.get(pipingUrl);
+      const res1 = await axiosClient.get(`${pipingUrl}/my_first_visit`);
       assert(res1.request.res.responseUrl.startsWith(`${issuerUrl}/interaction/`));
       // NOTE: login should be "user001", any password is OK
       const res2 = await axiosClient.post(`${res1.request.res.responseUrl}/login`,  "login=user001&password=dummypass");
@@ -251,7 +251,7 @@ rejection: socket_close
       assert.strictEqual(cookie.domain, "localhost");
       assert.strictEqual(cookie.httpOnly, true);
       // HTML redirect included
-      assert(res3.data.includes(`content="0;${pipingUrl}`));
+      assert(res3.data.includes(`content="0;/my_first_visit"`));
 
       await shouldTransfer({
         path: "/mypath",
