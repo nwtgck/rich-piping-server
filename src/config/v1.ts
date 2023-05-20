@@ -54,6 +54,7 @@ export const configV1Schema = z.object({
     session: z.object({
       forward: z.optional(z.object({
         query_param_name: z.string(),
+        allow_url_regexp: z.string(),
       })),
       cookie: z.object({
         name: z.string(),

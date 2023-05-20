@@ -11,7 +11,7 @@ import * as pipingVersion from "piping-server/dist/src/version";
 import {ConfigRef} from "../src/ConfigRef";
 import * as getPort from "get-port";
 import {serveOpenIdProvider} from "./serve-openid-provider";
-import axios from 'axios';
+import axios, {type AxiosError} from 'axios';
 import * as axiosCookieJarSupport from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
 
@@ -293,6 +293,7 @@ openid_connect:
   session:
     forward:
       query_param_name: my_session_forward_url
+      allow_url_regexp: (http://dummy_session_forward_url1)|(http://dummy_session_forward_url2)
     cookie:
       name: ${sessionCookieName}
       http_only: true
@@ -319,11 +320,22 @@ rejection: socket_close
       assert(res3.data.includes(`window.close()`));
 
       // Immediately forward page responded after logged in
-      const res4 = await axiosClient.get(`${pipingUrl}?my_session_forward_url=http://dummy_session_forward_url2`);
-      assert(res4.data.includes(`<html>`) && res4.data.includes("</html>"));
-      assert(res4.data.includes(`<script>`) && res4.data.includes("</script>"));
-      assert(res4.data.includes(`sessionForwardUrl = "http://dummy_session_forward_url2"`));
-      assert(res4.data.includes(`window.close()`));
+      {
+        const res = await axiosClient.get(`${pipingUrl}?my_session_forward_url=http://dummy_session_forward_url2`);
+        assert(res.data.includes(`<html>`) && res.data.includes("</html>"));
+        assert(res.data.includes(`<script>`) && res.data.includes("</script>"));
+        assert(res.data.includes(`sessionForwardUrl = "http://dummy_session_forward_url2"`));
+        assert(res.data.includes(`window.close()`));
+      }
+
+      // URL not in "allow_url_regexp" should be rejected
+      try {
+        await axiosClient.get(`${pipingUrl}?my_session_forward_url=http://should_be_invalid_session_forward_url`);
+      } catch (err) {
+        const axiosError = err as AxiosError;
+        assert.strictEqual(axiosError.response!.status, 400);
+        assert.strictEqual(axiosError.response!.data, "session forward URL is not allowed\n");
+      }
 
       providerServer.close();
     });

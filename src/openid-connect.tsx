@@ -55,9 +55,14 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   if (oidcConfig.session.forward !== undefined) {
     const sessionForwardUrl: string | null = url.searchParams.get(oidcConfig.session.forward.query_param_name);
     if (sessionForwardUrl !== null) {
-      // Already Cookie is set
-      const setCookieValue = undefined;
-      respondForwardHtml(setCookieValue, sessionId, sessionForwardUrl, res);
+      respondForwardHtml({
+        // Already Cookie is set
+        setCookieValue: undefined,
+        sessionId,
+        allowSessionForwardUrlRegexp: oidcConfig.session.forward.allow_url_regexp,
+        sessionForwardUrl,
+        res
+      });
       return "responded";
     }
   }
@@ -120,8 +125,14 @@ async function handleRedirect(logger: Logger | undefined, client: openidClient.B
       httpOnly: oidcConfig.session.cookie.http_only,
       maxAge: oidcConfig.session.age_seconds,
     });
-    if (oidcState?.session_forward_url !== undefined) {
-      respondForwardHtml(setCookieValue, newSessionId, oidcState.session_forward_url, res);
+    if (oidcConfig.session.forward !== undefined && oidcState?.session_forward_url !== undefined) {
+      respondForwardHtml({
+        setCookieValue,
+        sessionId: newSessionId,
+        allowSessionForwardUrlRegexp: oidcConfig.session.forward.allow_url_regexp,
+        sessionForwardUrl: oidcState.session_forward_url,
+        res,
+      });
       return;
     }
     res.writeHead(200, {
@@ -146,7 +157,23 @@ async function handleRedirect(logger: Logger | undefined, client: openidClient.B
   }
 }
 
-function respondForwardHtml(setCookieValue: string | undefined, sessionId: string, sessionForwardUrl: string, res: HttpRes) {
+function respondForwardHtml({setCookieValue, sessionId, allowSessionForwardUrlRegexp, sessionForwardUrl, res}: {
+  setCookieValue: string | undefined,
+  sessionId: string,
+  allowSessionForwardUrlRegexp: string,
+  sessionForwardUrl: string,
+  res: HttpRes
+}) {
+  if (!new RegExp(allowSessionForwardUrlRegexp).test(sessionForwardUrl)) {
+    res.writeHead(400, {
+      "Content-Type": "text/html",
+      ...(setCookieValue === undefined ? {} : {
+        "Set-Cookie": setCookieValue,
+      }),
+    });
+    res.end("session forward URL is not allowed\n");
+    return;
+  }
   res.writeHead(200, {
     "Content-Type": "text/html",
     ...(setCookieValue === undefined ? {} : {

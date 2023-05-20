@@ -93,6 +93,7 @@ openid_connect:
       # A CLI may server an ephemeral HTTP server on :65106 and open https://your_rich_piping_server/?my_session_forward_url=http://localhost:65106
       # The opened browser will POST http://localhost:65106 with `{ "session_id": "..." }` after logged in.
       query_param_name: my_session_forward_url
+      allow_url_regexp: ^http://localhost:\d+.*$
     age_seconds: 86400
 
 # Close socket when path not allowed
