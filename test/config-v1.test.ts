@@ -250,6 +250,8 @@ rejection: socket_close
       const cookie = cookieJar.toJSON().cookies.find(c => c.key === sessionCookieName)!;
       assert.strictEqual(cookie.domain, "localhost");
       assert.strictEqual(cookie.httpOnly, true);
+      // HTML redirect included
+      assert(res3.data.includes(`content="0;${pipingUrl}`));
 
       await shouldTransfer({
         path: "/mypath",

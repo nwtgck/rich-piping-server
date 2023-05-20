@@ -19,8 +19,9 @@ const oidcStateScheme = z.object({
 
 type OidcState = z.infer<typeof oidcStateScheme>
 
-export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeVerifier, codeChallenge, client, oidcConfig, req, res}: {
+export async function handleOpenIdConnect({logger, useHttps, openIdConnectUserStore, codeVerifier, codeChallenge, client, oidcConfig, req, res}: {
   logger: Logger | undefined,
+  useHttps: boolean,
   client: openidClient.BaseClient,
   codeVerifier: string,
   codeChallenge: string,
@@ -39,12 +40,12 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   const parsedCookie = cookie.parse(req.headers.cookie ?? "");
   const sessionId: string | undefined = parsedCookie[oidcConfig.session.cookie.name];
   if (sessionId === undefined) {
-    startAuthorization(client, codeChallenge, oidcConfig, req, res);
+    startAuthorization(useHttps, client, codeChallenge, oidcConfig, req, res);
     return "responded";
   }
   const userinfo = openIdConnectUserStore.findValidUserInfo(sessionId);
   if (userinfo === undefined) {
-    startAuthorization(client, codeChallenge, oidcConfig, req, res);
+    startAuthorization(useHttps, client, codeChallenge, oidcConfig, req, res);
     return "responded";
   }
   if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
@@ -77,10 +78,13 @@ function userinfoIsAllowed(allowUserinfos: NonNullable<NormalizedConfig["openid_
 }
 
 // usually go to login page
-function startAuthorization(client: openidClient.BaseClient, codeChallenge: string, oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>, req: HttpReq, res: HttpRes) {
+function startAuthorization(useHttps: boolean, client: openidClient.BaseClient, codeChallenge: string, oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>, req: HttpReq, res: HttpRes) {
   const url = new URL(req.url!, `http://${req.headers.host}`);
+  const originalProto = ((req.headers["x-forwarded-proto"] as string)?.split(",")[0] ?? (useHttps ? "https" : "http")).trim();
+  const originalHost = ((req.headers["x-forwarded-host"] as string)?.split(",")[0] ?? req.headers.host).trim();
+  const returnUrl = new URL(req.url!, `${originalProto}://${originalHost}`);
   const state: OidcState = {
-    return_url: new URL(req.url!, `http://${req.headers["x-forwarded-for"] ?? req.headers.host}`).href,
+    return_url: returnUrl.href,
     ...(oidcConfig.session.forward === undefined ? {} : {
       session_forward_url: url.searchParams.get(oidcConfig.session.forward.query_param_name) ?? undefined
     }),
