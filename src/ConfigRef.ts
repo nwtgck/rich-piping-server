@@ -4,7 +4,7 @@ import * as openidClient from "openid-client";
 type GenerateOpenIdClientParams = { issuerUrl: string, clientId: string, clientSecret: string, redirectUri: string }
 
 export class ConfigRef {
-  private config: NormalizedConfig| undefined;
+  private config: NormalizedConfig | undefined;
   private previousGenerateOpenIdClientParams: GenerateOpenIdClientParams | undefined;
   private cachedOpenidClientPromise: Promise<openidClient.BaseClient> | undefined;
 
