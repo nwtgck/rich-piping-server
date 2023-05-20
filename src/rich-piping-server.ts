@@ -6,6 +6,10 @@ import * as basicAuth from "basic-auth";
 import {fakeNginxResponse} from "./fake-nginx-response";
 import {type NormalizedConfig} from "./config/normalized-config";
 import * as log4js from "log4js";
+import * as openidClient from "openid-client";
+import {ConfigRef} from "./ConfigRef";
+import {OpenIdConnectUserStore} from "./OpenIdConnectUserStore";
+import {handleOpenIdConnect} from "./openid-connect";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
@@ -13,10 +17,13 @@ type RichPipingServer = (req: HttpReq, res: HttpRes) => void;
 
 type AllowPath = NonNullable<NormalizedConfig["allow_paths"]>[number];
 
-export function generateHandler({pipingServer, configRef, logger, useHttps}: {pipingServer: PipingServer, configRef: {ref?: NormalizedConfig | undefined}, logger?: log4js.Logger, useHttps: boolean}): RichPipingServer {
+export function generateHandler({pipingServer, configRef, logger, useHttps}: {pipingServer: PipingServer, configRef: ConfigRef, logger?: log4js.Logger, useHttps: boolean}): RichPipingServer {
   const pipingHandler = pipingServer.generateHandler(useHttps);
-  return (req, res) => {
-    const config = configRef.ref;
+  const codeVerifier = openidClient.generators.codeVerifier();
+  const codeChallenge = openidClient.generators.codeChallenge(codeVerifier);
+  const openIdConnectUserStore = new OpenIdConnectUserStore();
+  return async (req, res) => {
+    const config = configRef.get();
     if (config === undefined) {
       logger?.error("requested but config not loaded");
       req.socket.end();
@@ -29,6 +36,27 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
     // Basic auth is enabled and denied
     if (config.basic_auth_users !== undefined && handleBasicAuth(config.basic_auth_users, req, res) === "denied") {
       return
+    }
+    if (config.openid_connect !== undefined) {
+      const result: "authorized" | "responded" = await handleOpenIdConnect({
+        logger,
+        client: await configRef.openidClientPromise!,
+        codeVerifier,
+        codeChallenge,
+        openIdConnectUserStore,
+        oidcConfig: config.openid_connect,
+        req,
+        res,
+      });
+      switch (result) {
+        case "responded":
+          return;
+        case "authorized":
+          break;
+        default:
+          const exhaustiveCheck: never = result;
+          throw new Error(`unexpected result: ${exhaustiveCheck}`);
+      }
     }
     // Rewrite path for index
     // NOTE: may support "X-Forwarded-Prefix" in the future to tell original path

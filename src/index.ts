@@ -16,6 +16,7 @@ import {configWihtoutVersionSchema} from "./config/without-version";
 import {configV1Schema, migrateToConfigV1} from "./config/v1";
 import {NormalizedConfig, normalizeConfigV1} from "./config/normalized-config";
 import {configBasicSchema} from "./config/basic";
+import {ConfigRef} from "./ConfigRef";
 
 
 // Create option parser
@@ -78,7 +79,7 @@ const parser = yargs
 
 // Parse arguments
 const args = parser.parseSync(process.argv.slice(2));
-const configRef: {ref?: NormalizedConfig} = { };
+const configRef: ConfigRef = new ConfigRef();
 // Create a logger
 const logger = log4js.getLogger();
 logger.level = "info";
@@ -131,7 +132,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
         logZodError(configWithoutVersionParsed.error);
         return;
       }
-      configRef.ref = normalizeConfigV1(migrateToConfigV1(configWithoutVersionParsed.data));
+      configRef.set(normalizeConfigV1(logger, migrateToConfigV1(configWithoutVersionParsed.data)));
     }
     if (configBasicParsed.data.version === "1" || configBasicParsed.data.version === 1) {
       const configParsed = configV1Schema.safeParse(configYaml);
@@ -139,7 +140,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
         logZodError(configParsed.error);
         return;
       }
-      configRef.ref = normalizeConfigV1(configParsed.data);
+      configRef.set(normalizeConfigV1(logger, configParsed.data));
     }
     logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
   } catch (err) {
