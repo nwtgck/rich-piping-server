@@ -19,14 +19,15 @@ const oidcStateScheme = z.object({
 
 type OidcState = z.infer<typeof oidcStateScheme>
 
-export async function handleOpenIdConnect({logger, useHttps, openIdConnectUserStore, codeVerifier, codeChallenge, client, oidcConfig, req, res}: {
+type OidcConfig = NonNullable<NormalizedConfig["openid_connect"]>;
+
+export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeVerifier, codeChallenge, client, oidcConfig, req, res}: {
   logger: Logger | undefined,
-  useHttps: boolean,
   client: openidClient.BaseClient,
   codeVerifier: string,
   codeChallenge: string,
   openIdConnectUserStore: OpenIdConnectUserStore
-  oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>,
+  oidcConfig: OidcConfig,
   req: HttpReq,
   res: HttpRes,
 }): Promise<"authorized" | "responded"> {
@@ -40,12 +41,12 @@ export async function handleOpenIdConnect({logger, useHttps, openIdConnectUserSt
   const parsedCookie = cookie.parse(req.headers.cookie ?? "");
   const sessionId: string | undefined = parsedCookie[oidcConfig.session.cookie.name];
   if (sessionId === undefined) {
-    startAuthorization(useHttps, client, codeChallenge, oidcConfig, req, res);
+    startAuthorization(client, codeChallenge, oidcConfig, req, res);
     return "responded";
   }
   const userinfo = openIdConnectUserStore.findValidUserInfo(sessionId);
   if (userinfo === undefined) {
-    startAuthorization(useHttps, client, codeChallenge, oidcConfig, req, res);
+    startAuthorization(client, codeChallenge, oidcConfig, req, res);
     return "responded";
   }
   if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
@@ -70,7 +71,7 @@ export async function handleOpenIdConnect({logger, useHttps, openIdConnectUserSt
   return "authorized";
 }
 
-function userinfoIsAllowed(allowUserinfos: NonNullable<NormalizedConfig["openid_connect"]>["allow_userinfos"], userinfo: { sub?: string, email?: string }): boolean {
+function userinfoIsAllowed(allowUserinfos: OidcConfig["allow_userinfos"], userinfo: { sub?: string, email?: string }): boolean {
   const allowedUserinfo = allowUserinfos.find(u => {
     return "sub" in u && u.sub === userinfo.sub || "email" in u && u.email === userinfo.email;
   });
@@ -78,7 +79,7 @@ function userinfoIsAllowed(allowUserinfos: NonNullable<NormalizedConfig["openid_
 }
 
 // usually go to login page
-function startAuthorization(useHttps: boolean, client: openidClient.BaseClient, codeChallenge: string, oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>, req: HttpReq, res: HttpRes) {
+function startAuthorization(client: openidClient.BaseClient, codeChallenge: string, oidcConfig: OidcConfig, req: HttpReq, res: HttpRes) {
   const url = new URL(req.url!, `http://${req.headers.host}`);
   const state: OidcState = {
     return_to: req.url!,
@@ -97,7 +98,7 @@ function startAuthorization(useHttps: boolean, client: openidClient.BaseClient, 
   res.end();
 }
 
-async function handleRedirect(logger: Logger | undefined, client: openidClient.BaseClient, codeVerifier: string, openIdConnectUserStore: OpenIdConnectUserStore, oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>, req: HttpReq, res: HttpRes): Promise<void> {
+async function handleRedirect(logger: Logger | undefined, client: openidClient.BaseClient, codeVerifier: string, openIdConnectUserStore: OpenIdConnectUserStore, oidcConfig: OidcConfig, req: HttpReq, res: HttpRes): Promise<void> {
   const params = client.callbackParams(req);
   let oidcState: OidcState | undefined;
   try {
