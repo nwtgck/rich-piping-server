@@ -303,7 +303,7 @@ rejection: socket_close
 
       const cookieJar = new CookieJar();
       const axiosClient = axiosCookieJarSupport.wrapper(axios.create({ jar: cookieJar }));
-      const res1 = await axiosClient.get(`${pipingUrl}?my_session_forward_url=http://dummy_session_forward_url`);
+      const res1 = await axiosClient.get(`${pipingUrl}?my_session_forward_url=http://dummy_session_forward_url1`);
       assert(res1.request.res.responseUrl.startsWith(`${issuerUrl}/interaction/`));
       // NOTE: login should be "user001", any password is OK
       const res2 = await axiosClient.post(`${res1.request.res.responseUrl}/login`,  "login=user001&password=dummypass");
@@ -315,8 +315,16 @@ rejection: socket_close
       assert.strictEqual(cookie.httpOnly, true);
       assert(res3.data.includes(`<html>`) && res3.data.includes("</html>"));
       assert(res3.data.includes(`<script>`) && res3.data.includes("</script>"));
-      assert(res3.data.includes(`sessionForwardUrl = "http://dummy_session_forward_url"`));
+      assert(res3.data.includes(`sessionForwardUrl = "http://dummy_session_forward_url1"`));
       assert(res3.data.includes(`window.close()`));
+
+      // Immediately forward page responded after logged in
+      const res4 = await axiosClient.get(`${pipingUrl}?my_session_forward_url=http://dummy_session_forward_url2`);
+      assert(res4.data.includes(`<html>`) && res4.data.includes("</html>"));
+      assert(res4.data.includes(`<script>`) && res4.data.includes("</script>"));
+      assert(res4.data.includes(`sessionForwardUrl = "http://dummy_session_forward_url2"`));
+      assert(res4.data.includes(`window.close()`));
+
       providerServer.close();
     });
   });

@@ -52,6 +52,15 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
     res.end(`NOT allowed user: ${JSON.stringify(userinfo)}\n`);
     return "responded";
   }
+  if (oidcConfig.session.forward !== undefined) {
+    const sessionForwardUrl: string | null = url.searchParams.get(oidcConfig.session.forward.query_param_name);
+    if (sessionForwardUrl !== null) {
+      // Already Cookie is set
+      const setCookieValue = undefined;
+      respondForwardHtml(setCookieValue, sessionId, sessionForwardUrl, res);
+      return "responded";
+    }
+  }
   return "authorized";
 }
 
@@ -137,10 +146,12 @@ async function handleRedirect(logger: Logger | undefined, client: openidClient.B
   }
 }
 
-function respondForwardHtml(setCookieValue: string, sessionId: string, sessionForwardUrl: string, res: HttpRes) {
+function respondForwardHtml(setCookieValue: string | undefined, sessionId: string, sessionForwardUrl: string, res: HttpRes) {
   res.writeHead(200, {
     "Content-Type": "text/html",
-    "Set-Cookie": setCookieValue,
+    ...(setCookieValue === undefined ? {} : {
+      "Set-Cookie": setCookieValue,
+    }),
   });
   const sendingBody: string = JSON.stringify({
     session_id: sessionId,
