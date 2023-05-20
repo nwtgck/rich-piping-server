@@ -5,6 +5,8 @@ import * as http from "http";
 import * as http2 from "http2";
 import {Logger} from "log4js";
 import * as openidClient from "openid-client";
+import { h } from 'preact';
+import {renderToString} from "preact-render-to-string";
 
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
@@ -59,8 +61,13 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
       if (returnUrl === undefined) {
         res.end(`allowed: ${JSON.stringify(userinfo)}\n`);
       } else {
-        // TODO: XSS OK?
-        res.end(`<html><head><meta http-equiv="refresh" content=0;url=${JSON.stringify(returnUrl)}></head></html>`);
+        res.end(renderToString(
+          <html>
+          <head>
+            <meta http-equiv="refresh" content={`0;${returnUrl}`}></meta>
+          </head>
+          </html>
+        ));
       }
     } catch (err: unknown) {
       logger?.info(err);
