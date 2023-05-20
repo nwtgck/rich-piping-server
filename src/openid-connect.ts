@@ -10,9 +10,9 @@ import * as openidClient from "openid-client";
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 
-export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeVerifier, codeChallenge, openIdClient, openidConnectConfig, req, res}: {
+export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeVerifier, codeChallenge, client, openidConnectConfig, req, res}: {
   logger: Logger | undefined,
-  openIdClient: openidClient.BaseClient,
+  client: openidClient.BaseClient,
   codeVerifier: string,
   codeChallenge: string,
   openIdConnectUserStore: OpenIdConnectUserStore
@@ -24,7 +24,7 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   openIdConnectUserStore.setAgeSeconds(openidConnectConfig.session.age_seconds);
   const url = new URL(req.url!, `http://${req.headers.host}`);
   if (url.pathname === openidConnectConfig.redirect.path) {
-    const params = openIdClient.callbackParams(req);
+    const params = client.callbackParams(req);
     let returnUrl: string | undefined;
     try {
       returnUrl = JSON.parse(params.state ?? "").return_url;
@@ -32,7 +32,7 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
 
     }
     try {
-      const tokenSet = await openIdClient.callback(openidConnectConfig.redirect.uri, params, {
+      const tokenSet = await client.callback(openidConnectConfig.redirect.uri, params, {
         state: params.state,
         code_verifier: codeVerifier,
       });
@@ -41,11 +41,8 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
         res.end("Access token not set\n");
         return "responded";
       }
-      const userinfo = await openIdClient.userinfo(tokenSet.access_token);
-      const allowedUserinfo = openidConnectConfig.allow_userinfos.find(u => {
-        return "sub" in u && u.sub === userinfo.sub || "email" in u && u.email === userinfo.email;
-      });
-      if (allowedUserinfo === undefined) {
+      const userinfo = await client.userinfo(tokenSet.access_token);
+      if (!userinfoIsAllowed(openidConnectConfig.allow_userinfos, userinfo)) {
         res.writeHead(400, {"Content-Type": "text/plain"});
         res.end(`NOT allowed user\n`);
         return "responded";
@@ -74,19 +71,41 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   }
   const parsedCookie = cookie.parse(req.headers.cookie ?? "");
   const sessionId: string | undefined = parsedCookie[openidConnectConfig.session.cookie.name];
-  if (sessionId === undefined || !openIdConnectUserStore.isValidSessionId(sessionId)) {
-    // Start authorization request
-    const authorizationUrl = openIdClient.authorizationUrl({
-      scope: "openid email",
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-      state: JSON.stringify({
-        return_url: new URL(req.url!, `http://${req.headers["x-forwarded-for"] ?? req.headers.host}`),
-      }),
-    });
-    res.writeHead(302, {Location: authorizationUrl});
-    res.end();
+  if (sessionId === undefined) {
+    startAuthorization(client, codeChallenge, req, res);
+    return "responded";
+  }
+  const userinfo = openIdConnectUserStore.findValidUserInfo(sessionId);
+  if (userinfo === undefined) {
+    startAuthorization(client, codeChallenge, req, res);
+    return "responded";
+  }
+  if (!userinfoIsAllowed(openidConnectConfig.allow_userinfos, userinfo)) {
+    res.writeHead(400, {"Content-Type": "text/plain"});
+    res.end(`NOT allowed user: ${JSON.stringify(userinfo)}\n`);
     return "responded";
   }
   return "authorized";
+}
+
+function userinfoIsAllowed(allowUserinfos: NonNullable<NormalizedConfig["openid_connect"]>["allow_userinfos"], userinfo: { sub?: string, email?: string }): boolean {
+  const allowedUserinfo = allowUserinfos.find(u => {
+    return "sub" in u && u.sub === userinfo.sub || "email" in u && u.email === userinfo.email;
+  });
+  return allowedUserinfo !== undefined;
+}
+
+// usually go to login page
+function startAuthorization(client: openidClient.BaseClient, codeChallenge: string, req: HttpReq, res: HttpRes) {
+  // Start authorization request
+  const authorizationUrl = client.authorizationUrl({
+    scope: "openid email",
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    state: JSON.stringify({
+      return_url: new URL(req.url!, `http://${req.headers["x-forwarded-for"] ?? req.headers.host}`),
+    }),
+  });
+  res.writeHead(302, {Location: authorizationUrl});
+  res.end();
 }

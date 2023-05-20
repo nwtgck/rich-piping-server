@@ -40,7 +40,7 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
     if (config.openid_connect !== undefined) {
       const result: "authorized" | "responded" = await handleOpenIdConnect({
         logger,
-        openIdClient: await configRef.openidClientPromise!,
+        client: await configRef.openidClientPromise!,
         codeVerifier,
         codeChallenge,
         openIdConnectUserStore,

@@ -22,12 +22,16 @@ export class OpenIdConnectUserStore {
     return sessionId;
   }
 
-  isValidSessionId(sessionId: string): boolean {
+  findValidUserInfo(sessionId: string): Userinfo | undefined {
     const userInfo = this.sessionIdToUserInfo.get(sessionId);
     if (userInfo === undefined) {
-      return false;
+      return undefined;
     }
-    return new Date().getTime() <= userInfo.createdAt.getTime() + (this.ageSeconds * 1000);
+    if (new Date().getTime() <= userInfo.createdAt.getTime() + (this.ageSeconds * 1000)) {
+      return userInfo;
+    }
+    this.sessionIdToUserInfo.delete(sessionId);
+    return undefined;
   }
 
   private generateSessionId(): string {
