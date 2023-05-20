@@ -7,34 +7,41 @@ import {Logger} from "log4js";
 import * as openidClient from "openid-client";
 import { h } from 'preact';
 import {renderToString} from "preact-render-to-string";
-
+import {z} from "zod";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
 
-export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeVerifier, codeChallenge, client, openidConnectConfig, req, res}: {
+const oidcStateScheme = z.object({
+  return_url: z.string(),
+  session_forward_url: z.optional(z.string()),
+});
+
+type OidcState = z.infer<typeof oidcStateScheme>
+
+export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeVerifier, codeChallenge, client, oidcConfig, req, res}: {
   logger: Logger | undefined,
   client: openidClient.BaseClient,
   codeVerifier: string,
   codeChallenge: string,
   openIdConnectUserStore: OpenIdConnectUserStore
-  openidConnectConfig: NonNullable<NormalizedConfig["openid_connect"]>,
+  oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>,
   req: HttpReq,
   res: HttpRes,
 }): Promise<"authorized" | "responded"> {
   // Always set because config may be hot reloaded
-  openIdConnectUserStore.setAgeSeconds(openidConnectConfig.session.age_seconds);
+  openIdConnectUserStore.setAgeSeconds(oidcConfig.session.age_seconds);
   const url = new URL(req.url!, `http://${req.headers.host}`);
-  if (url.pathname === openidConnectConfig.redirect.path) {
+  if (url.pathname === oidcConfig.redirect.path) {
     const params = client.callbackParams(req);
-    let returnUrl: string | undefined;
+    let oidcState: OidcState | undefined;
     try {
-      returnUrl = JSON.parse(params.state ?? "").return_url;
+      oidcState = oidcStateScheme.parse(JSON.parse(params.state ?? ""));
     } catch {
 
     }
     try {
-      const tokenSet = await client.callback(openidConnectConfig.redirect.uri, params, {
+      const tokenSet = await client.callback(oidcConfig.redirect.uri, params, {
         state: params.state,
         code_verifier: codeVerifier,
       });
@@ -44,27 +51,31 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
         return "responded";
       }
       const userinfo = await client.userinfo(tokenSet.access_token);
-      if (!userinfoIsAllowed(openidConnectConfig.allow_userinfos, userinfo)) {
+      if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
         res.writeHead(400, {"Content-Type": "text/plain"});
         res.end(`NOT allowed user\n`);
         return "responded";
       }
       const newSessionId = openIdConnectUserStore.setUserinfo(userinfo);
-      const setCookieValue = cookie.serialize(openidConnectConfig.session.cookie.name, newSessionId, {
-        httpOnly: openidConnectConfig.session.cookie.http_only,
-        maxAge: openidConnectConfig.session.age_seconds,
-      })
+      const setCookieValue = cookie.serialize(oidcConfig.session.cookie.name, newSessionId, {
+        httpOnly: oidcConfig.session.cookie.http_only,
+        maxAge: oidcConfig.session.age_seconds,
+      });
+      if (oidcState?.session_forward_url !== undefined) {
+        respondForwardHtml(setCookieValue, newSessionId, oidcState.session_forward_url, res);
+        return "responded";
+      }
       res.writeHead(200, {
         "Content-Type": "text/html",
         "Set-Cookie": setCookieValue,
       });
-      if (returnUrl === undefined) {
+      if (oidcState?.return_url === undefined) {
         res.end(`allowed: ${JSON.stringify(userinfo)}\n`);
       } else {
         res.end(renderToString(
           <html>
           <head>
-            <meta http-equiv="refresh" content={`0;${returnUrl}`}></meta>
+            <meta http-equiv="refresh" content={`0;${oidcState.return_url}`}></meta>
           </head>
           </html>
         ));
@@ -77,17 +88,17 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
     return "responded";
   }
   const parsedCookie = cookie.parse(req.headers.cookie ?? "");
-  const sessionId: string | undefined = parsedCookie[openidConnectConfig.session.cookie.name];
+  const sessionId: string | undefined = parsedCookie[oidcConfig.session.cookie.name];
   if (sessionId === undefined) {
-    startAuthorization(client, codeChallenge, req, res);
+    startAuthorization(client, codeChallenge, oidcConfig, req, res);
     return "responded";
   }
   const userinfo = openIdConnectUserStore.findValidUserInfo(sessionId);
   if (userinfo === undefined) {
-    startAuthorization(client, codeChallenge, req, res);
+    startAuthorization(client, codeChallenge, oidcConfig, req, res);
     return "responded";
   }
-  if (!userinfoIsAllowed(openidConnectConfig.allow_userinfos, userinfo)) {
+  if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
     res.writeHead(400, {"Content-Type": "text/plain"});
     res.end(`NOT allowed user: ${JSON.stringify(userinfo)}\n`);
     return "responded";
@@ -103,16 +114,62 @@ function userinfoIsAllowed(allowUserinfos: NonNullable<NormalizedConfig["openid_
 }
 
 // usually go to login page
-function startAuthorization(client: openidClient.BaseClient, codeChallenge: string, req: HttpReq, res: HttpRes) {
+function startAuthorization(client: openidClient.BaseClient, codeChallenge: string, oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>, req: HttpReq, res: HttpRes) {
+  const url = new URL(req.url!, `http://${req.headers.host}`);
+  const state: OidcState = {
+    return_url: new URL(req.url!, `http://${req.headers["x-forwarded-for"] ?? req.headers.host}`).href,
+    ...(oidcConfig.session.forward === undefined ? {} : {
+      session_forward_url: url.searchParams.get(oidcConfig.session.forward.query_param_name) ?? undefined
+    }),
+  };
   // Start authorization request
   const authorizationUrl = client.authorizationUrl({
     scope: "openid email",
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
-    state: JSON.stringify({
-      return_url: new URL(req.url!, `http://${req.headers["x-forwarded-for"] ?? req.headers.host}`),
-    }),
+    state: JSON.stringify(state),
   });
   res.writeHead(302, {Location: authorizationUrl});
   res.end();
+}
+
+function respondForwardHtml(setCookieValue: string, sessionId: string, sessionForwardUrl: string, res: HttpRes) {
+  res.writeHead(200, {
+    "Content-Type": "text/html",
+    "Set-Cookie": setCookieValue,
+  });
+  const sendingBody: string = JSON.stringify({
+    session_id: sessionId,
+  });
+  // language=js
+  const browserScript = `
+const sessionForwardUrl = ${JSON.stringify(sessionForwardUrl)};
+const body = ${JSON.stringify(sendingBody)};
+const retryMax = 10;
+
+(async () => {
+  for (let i = 0; i < retryMax; i++) {
+    try {
+      const res = await fetch(sessionForwardUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        mode: "cors",
+        body,
+      });
+      if (res.ok) {
+        break;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    await new Promise(resolve => setTimeout(resolve, 5000));
+  }
+  window.close();
+})();`;
+  res.end(renderToString(
+    <html>
+    <script dangerouslySetInnerHTML={{__html: browserScript}}>
+    </script>
+    </html>
+  ));
 }

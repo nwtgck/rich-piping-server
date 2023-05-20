@@ -44,7 +44,7 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
         codeVerifier,
         codeChallenge,
         openIdConnectUserStore,
-        openidConnectConfig: config.openid_connect,
+        oidcConfig: config.openid_connect,
         req,
         res,
       });
