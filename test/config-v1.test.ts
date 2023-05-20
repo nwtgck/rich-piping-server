@@ -199,6 +199,75 @@ rejection: socket_close
     });
   });
 
+  context("custom tag", () => {
+    it("should resolve !env tag", async () => {
+      assert.strictEqual(process.env["MY_BASIC_PASSWORD"], undefined);
+      process.env["MY_BASIC_PASSWORD"] = "my_secret_password";
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+version: "1"
+config_for: rich_piping_server
+
+basic_auth_users:
+  - username: user1
+    password: !env "MY_BASIC_PASSWORD"
+
+rejection: socket_close
+`));
+      assert.strictEqual(configRef.get()!.basic_auth_users![0].password, process.env["MY_BASIC_PASSWORD"]);
+      delete process.env["MY_BASIC_PASSWORD"];
+    });
+
+    it("should resolve !concat tag", async () => {
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+version: "1"
+config_for: rich_piping_server
+
+basic_auth_users:
+  - username: user1
+    password: !concat ["my", "secret", "pass", "word"]
+
+rejection: socket_close
+`));
+      assert.strictEqual(configRef.get()!.basic_auth_users![0].password, ["my", "secret", "pass", "word"].join(""));
+    });
+
+    it("should resolve !unrecommended_js tag", async () => {
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+version: "1"
+config_for: rich_piping_server
+
+basic_auth_users:
+  - username: user1
+    password: !unrecommended_js |
+      return "mypasswordfromjavascript"
+
+rejection: socket_close
+`));
+      assert.strictEqual(configRef.get()!.basic_auth_users![0].password, "mypasswordfromjavascript");
+    });
+
+    it("should resolve nested tags", async () => {
+      assert.strictEqual(process.env["MY_USER_NAME_PREFIX"], undefined);
+      process.env["MY_USER_NAME_PREFIX"] = "myuserprefix_";
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+version: "1"
+config_for: rich_piping_server
+
+basic_auth_users:
+  - username: !concat [!env "MY_USER_NAME_PREFIX", 1234]
+    password: dummy
+
+rejection: socket_close
+`));
+      assert.strictEqual(configRef.get()!.basic_auth_users![0].username, "myuserprefix_1234");
+      delete process.env["MY_USER_NAME_PREFIX"];
+    });
+  });
+
   context("OpenID Connect", () => {
     it("should transfer", async () => {
       const clientId = "myclientid";

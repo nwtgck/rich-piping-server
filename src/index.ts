@@ -14,10 +14,10 @@ import * as piping from "piping-server";
 import {generateHandler} from "./rich-piping-server";
 import {configWihtoutVersionSchema} from "./config/without-version";
 import {configV1Schema, migrateToConfigV1} from "./config/v1";
-import {NormalizedConfig, normalizeConfigV1} from "./config/normalized-config";
+import {normalizeConfigV1} from "./config/normalized-config";
 import {configBasicSchema} from "./config/basic";
 import {ConfigRef} from "./ConfigRef";
-
+import {customYamlLoad} from "./custom-yaml-load";
 
 // Create option parser
 const parser = yargs
@@ -54,7 +54,7 @@ const parser = yargs
   .alias("config-path", "config-yaml-path")
   .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
-    const configYaml = yaml.load(fs.readFileSync(argv.configPath, 'utf8'));
+    const configYaml = customYamlLoad(fs.readFileSync(argv.configPath, 'utf8'));
     if (configV1Schema.safeParse(configYaml).success) {
       console.log("The config is already a valid config v1");
       return;
@@ -117,7 +117,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
   try {
-    const configYaml = yaml.load(fs.readFileSync(configYamlPath, 'utf8'));
+    const configYaml = customYamlLoad(fs.readFileSync(configYamlPath, 'utf8'));
     // NOTE: using configBasicSchema makes error message better
     const configBasicParsed = configBasicSchema.safeParse(configYaml);
     if (!configBasicParsed.success) {
