@@ -59,6 +59,26 @@ Here are some example results of the server with the config.
 - reject because path is not allowed: `curl -u user1:pass1234 http://localhost:8080/`
 - reject because of no basic auth: `curl http://localhost:8080/0s6twklxkrcfs1u`
 
+### Tags
+
+These tags are available in config.
+- `!env MY_VALUE1`
+- `!concat [ "hello", !env "MY_VALUE1" ]`
+- `!unrecommended_js "return new Date().getMonth() < 5"`
+
+Here is an example.
+
+```yaml
+...
+
+basic_auth_users:
+  - username: !env "USER_NAME1"
+    password: !env "PASSWORD1"
+...
+```
+
+`!unrecommended_js` is not recommended to use because this behavior highly depends on underlying the runtime and the behavior may change. 
+
 ### OpenID Connect
 
 This is an experimental feature and it may have breaking changes.
