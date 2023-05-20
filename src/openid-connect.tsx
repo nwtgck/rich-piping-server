@@ -33,58 +33,7 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   openIdConnectUserStore.setAgeSeconds(oidcConfig.session.age_seconds);
   const url = new URL(req.url!, `http://${req.headers.host}`);
   if (url.pathname === oidcConfig.redirect.path) {
-    const params = client.callbackParams(req);
-    let oidcState: OidcState | undefined;
-    try {
-      oidcState = oidcStateScheme.parse(JSON.parse(params.state ?? ""));
-    } catch {
-
-    }
-    try {
-      const tokenSet = await client.callback(oidcConfig.redirect.uri, params, {
-        state: params.state,
-        code_verifier: codeVerifier,
-      });
-      if (tokenSet.access_token === undefined) {
-        res.writeHead(400);
-        res.end("Access token not set\n");
-        return "responded";
-      }
-      const userinfo = await client.userinfo(tokenSet.access_token);
-      if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
-        res.writeHead(400, {"Content-Type": "text/plain"});
-        res.end(`NOT allowed user\n`);
-        return "responded";
-      }
-      const newSessionId = openIdConnectUserStore.setUserinfo(userinfo);
-      const setCookieValue = cookie.serialize(oidcConfig.session.cookie.name, newSessionId, {
-        httpOnly: oidcConfig.session.cookie.http_only,
-        maxAge: oidcConfig.session.age_seconds,
-      });
-      if (oidcState?.session_forward_url !== undefined) {
-        respondForwardHtml(setCookieValue, newSessionId, oidcState.session_forward_url, res);
-        return "responded";
-      }
-      res.writeHead(200, {
-        "Content-Type": "text/html",
-        "Set-Cookie": setCookieValue,
-      });
-      if (oidcState?.return_url === undefined) {
-        res.end(`allowed: ${JSON.stringify(userinfo)}\n`);
-      } else {
-        res.end(renderToString(
-          <html>
-          <head>
-            <meta http-equiv="refresh" content={`0;${oidcState.return_url}`}></meta>
-          </head>
-          </html>
-        ));
-      }
-    } catch (err: unknown) {
-      logger?.info(err);
-      res.writeHead(400);
-      res.end();
-    }
+    await handleRedirect(logger, client, codeVerifier, openIdConnectUserStore, oidcConfig, req, res);
     return "responded";
   }
   const parsedCookie = cookie.parse(req.headers.cookie ?? "");
@@ -131,6 +80,61 @@ function startAuthorization(client: openidClient.BaseClient, codeChallenge: stri
   });
   res.writeHead(302, {Location: authorizationUrl});
   res.end();
+}
+
+async function handleRedirect(logger: Logger | undefined, client: openidClient.BaseClient, codeVerifier: string, openIdConnectUserStore: OpenIdConnectUserStore, oidcConfig: NonNullable<NormalizedConfig["openid_connect"]>, req: HttpReq, res: HttpRes): Promise<void> {
+  const params = client.callbackParams(req);
+  let oidcState: OidcState | undefined;
+  try {
+    oidcState = oidcStateScheme.parse(JSON.parse(params.state ?? ""));
+  } catch {
+
+  }
+  try {
+    const tokenSet = await client.callback(oidcConfig.redirect.uri, params, {
+      state: params.state,
+      code_verifier: codeVerifier,
+    });
+    if (tokenSet.access_token === undefined) {
+      res.writeHead(400);
+      res.end("Access token not set\n");
+      return;
+    }
+    const userinfo = await client.userinfo(tokenSet.access_token);
+    if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
+      res.writeHead(400, {"Content-Type": "text/plain"});
+      res.end(`NOT allowed user: ${JSON.stringify(userinfo)}\n`);
+      return;
+    }
+    const newSessionId = openIdConnectUserStore.setUserinfo(userinfo);
+    const setCookieValue = cookie.serialize(oidcConfig.session.cookie.name, newSessionId, {
+      httpOnly: oidcConfig.session.cookie.http_only,
+      maxAge: oidcConfig.session.age_seconds,
+    });
+    if (oidcState?.session_forward_url !== undefined) {
+      respondForwardHtml(setCookieValue, newSessionId, oidcState.session_forward_url, res);
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "text/html",
+      "Set-Cookie": setCookieValue,
+    });
+    if (oidcState?.return_url === undefined) {
+      res.end(`allowed: ${JSON.stringify(userinfo)}\n`);
+    } else {
+      res.end(renderToString(
+        <html>
+        <head>
+          <meta http-equiv="refresh" content={`0;${oidcState.return_url}`}></meta>
+        </head>
+        </html>
+      ));
+    }
+  } catch (err: unknown) {
+    logger?.info(err);
+    res.writeHead(400);
+    res.end();
+  }
 }
 
 function respondForwardHtml(setCookieValue: string, sessionId: string, sessionForwardUrl: string, res: HttpRes) {
