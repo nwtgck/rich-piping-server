@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+## [0.3.1] - 2023-05-20
+### Fixed
+* Use Node.js 18 in vercel/pkg build for ARM
+
 ## [0.3.0] - 2023-05-20
 ### Changed
 * Update dependencies
@@ -41,7 +45,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 * Support TLS certificate hot reload
 * Add "migrate-config" subcommand
 
-[Unreleased]: https://github.com/nwtgck/rich-piping-server/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/nwtgck/rich-piping-server/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/nwtgck/rich-piping-server/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.0...v0.2.1
