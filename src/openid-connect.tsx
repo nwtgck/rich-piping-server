@@ -31,6 +31,7 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   req: HttpReq,
   res: HttpRes,
 }): Promise<"authorized" | "responded"> {
+  logger?.info(`OpenID Connect: ${req.method} ${req.url} ${req.httpVersion}`);
   // Always set because config may be hot reloaded
   openIdConnectUserStore.setAgeSeconds(oidcConfig.session.age_seconds);
   const url = new URL(req.url!, `http://${req.headers.host}`);
@@ -50,11 +51,13 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
     return "responded";
   }
   if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
+    logger?.info(`not allowed userinfo: ${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
     res.writeHead(400, {"Content-Type": "text/plain"});
     res.end(`NOT allowed user: ${JSON.stringify(userinfo)}\n`);
     return "responded";
   }
   if (oidcConfig.session.forward !== undefined) {
+    logger?.info(`session forwarding: userinfo=${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
     const sessionForwardUrl: string | null = url.searchParams.get(oidcConfig.session.forward.query_param_name);
     if (sessionForwardUrl !== null) {
       respondForwardHtml({
@@ -68,10 +71,13 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
       return "responded";
     }
   }
+  logger?.info(`OpenID Connect authorized: userinfo=${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
   return "authorized";
 }
 
-function userinfoIsAllowed(allowUserinfos: OidcConfig["allow_userinfos"], userinfo: { sub?: string, email?: string, email_verified?: boolean }): boolean {
+type Userinfo = { sub?: string, email?: string, email_verified?: boolean };
+
+function userinfoIsAllowed(allowUserinfos: OidcConfig["allow_userinfos"], userinfo: Userinfo): boolean {
   const allowedUserinfo = allowUserinfos.find(u => {
     if ("sub" in u) {
       return u.sub === userinfo.sub;
@@ -130,10 +136,12 @@ async function handleRedirect(logger: Logger | undefined, client: openidClient.B
     }
     const userinfo = await client.userinfo(tokenSet.access_token);
     if (!userinfoIsAllowed(oidcConfig.allow_userinfos, userinfo)) {
+      logger?.info(`not allowed userinfo: ${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
       res.writeHead(400, {"Content-Type": "text/plain"});
       res.end(`NOT allowed user: ${JSON.stringify(userinfo)}\n`);
       return;
     }
+    logger?.info(`allowed userinfo: ${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
     const newSessionId = openIdConnectUserStore.setUserinfo(userinfo);
     const setCookieValue = cookie.serialize(oidcConfig.session.cookie.name, newSessionId, {
       httpOnly: oidcConfig.session.cookie.http_only,
@@ -229,4 +237,22 @@ const retryMax = 10;
     </script>
     </html>
   ));
+}
+
+function userinfoForLog(config: NonNullable<OidcConfig["log"]>["userinfo"], userinfo: Userinfo): string {
+  const extracted = {
+    sub: config?.sub === true ? userinfo.sub : undefined,
+    ...(config?.email === true ? {
+      email: userinfo.email,
+      email_verified: userinfo.email_verified,
+    } : {}),
+  };
+  const extractedStr = JSON.stringify(extracted);
+  if (extractedStr === "{}") {
+    return "{...}";
+  }
+  if (JSON.stringify(userinfo) !== extractedStr) {
+    return extractedStr.replace(/}$/, ", ...}");
+  }
+  return extractedStr;
 }

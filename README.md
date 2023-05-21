@@ -118,6 +118,12 @@ openid_connect:
       query_param_name: my_session_forward_url
       allow_url_regexp: ^http://localhost:\d+.*$
     age_seconds: 86400
+  # optional
+  log:
+    # optional
+    userinfo:
+      sub: false
+      email: false
 
 # Close socket when path not allowed
 rejection: socket_close

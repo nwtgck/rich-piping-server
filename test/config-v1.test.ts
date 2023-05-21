@@ -425,5 +425,36 @@ rejection: socket_close
 
       providerServer.close();
     });
+
+    it("should parse log config", async () => {
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+        version: "1"
+        config_for: rich_piping_server
+
+        experimental_openid_connect: true
+        openid_connect:
+          issuer_url: https://dummyissue
+          client_id: myclientid
+          client_secret: thisissecret
+          redirect:
+            uri: https://dummyredirecturi/my_callback
+            path: /my_callback
+          allow_userinfos: [ ]
+          session:
+            cookie:
+              name: dummycookiename
+              http_only: true
+            age_seconds: 60
+          log:
+            userinfo:
+              sub: true
+              email: false
+
+        rejection: socket_close
+      `));
+      assert.strictEqual(configRef.get()?.openid_connect?.log?.userinfo?.sub, true);
+      assert.strictEqual(configRef.get()?.openid_connect?.log?.userinfo?.email, false);
+    });
   });
 });

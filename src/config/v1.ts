@@ -65,6 +65,12 @@ export const configV1Schema = z.object({
       }),
       age_seconds: z.number(),
     }),
+    log: z.optional(z.object({
+      userinfo: z.optional(z.object({
+        sub: z.boolean(),
+        email: z.boolean(),
+      })),
+    })),
   })),
 });
 export type ConfigV1 = z.infer<typeof configV1Schema>;
