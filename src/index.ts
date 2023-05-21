@@ -133,7 +133,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
   }
 }
 
-function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath }: {
+async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath }: {
   host: string | undefined,
   httpPort: number,
   enableHttps: boolean,
@@ -153,10 +153,13 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
   // Create a piping server
   const pipingServer = new piping.Server({logger});
 
-  http.createServer(generateHandler({pipingServer, configRef, logger, useHttps: false}))
-    .listen({ host, port: httpPort }, () => {
-      logger.info(`Listen HTTP on ${httpPort}...`);
-    });
+  const httpServedPromise = new Promise<void>(resolve => {
+    http.createServer(generateHandler({pipingServer, configRef, logger, useHttps: false}))
+      .listen({ host, port: httpPort }, () => {
+        logger.info(`Listen HTTP on ${httpPort}...`);
+        resolve();
+      });
+  });
 
   if (enableHttps) {
     if (httpsPort === undefined) {
@@ -193,10 +196,16 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
     };
     fs.watchFile(serverCrtPath, updateSecureContext);
     fs.watchFile(serverKeyPath, updateSecureContext);
-    http2Server.listen({ host, port: httpsPort }, () => {
-      logger.info(`Listen HTTPS on ${httpsPort}...`);
+
+    await new Promise<void>(resolve => {
+      http2Server.listen({ host, port: httpsPort }, () => {
+        logger.info(`Listen HTTPS on ${httpsPort}...`);
+        resolve();
+      });
     });
   }
+
+  await httpServedPromise;
 
   // Catch and ignore error
   process.on("uncaughtException", (err) => {
