@@ -8,7 +8,6 @@ import * as tls from "tls";
 import * as log4js from "log4js";
 import * as yargs from "yargs";
 import { z } from "zod";
-import * as yaml from "js-yaml";
 import * as piping from "piping-server";
 
 import {generateHandler} from "./rich-piping-server";
@@ -18,6 +17,7 @@ import {normalizeConfigV1} from "./config/normalized-config";
 import {configBasicSchema} from "./config/basic";
 import {ConfigRef} from "./ConfigRef";
 import {customYamlLoad} from "./custom-yaml-load";
+import {migrateConfigCommand} from "./command/migrate-config-command";
 
 // Create option parser
 const parser = yargs
@@ -52,28 +52,13 @@ const parser = yargs
     required: true,
   })
   .alias("config-path", "config-yaml-path")
+  .epilogue(`\
+Example configs are found in
+https://github.com/nwtgck/rich-piping-server#readme
+`)
   .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
-    const configYaml = customYamlLoad(fs.readFileSync(argv.configPath, 'utf8'));
-    if (configV1Schema.safeParse(configYaml).success) {
-      console.log("The config is already a valid config v1");
-      return;
-    }
-    const configParsed = configWihtoutVersionSchema.safeParse(configYaml);
-    if(!configParsed.success) {
-      const issueStack = configParsed.error.issues.slice();
-      while (issueStack.length > 0) {
-        const issue = issueStack.pop()!;
-        if (issue.code === "invalid_union") {
-          issueStack.push(...issue.unionErrors.flatMap(e => e.issues));
-          continue;
-        }
-        process.stderr.write(`config error hint: ${JSON.stringify(issue)}\n`);
-      }
-      process.exit(1);
-    }
-    const configV1 = migrateToConfigV1(configParsed.data);
-    console.log(yaml.dump(configV1));
+    migrateConfigCommand(argv.configPath);
   });
 
 
@@ -148,7 +133,7 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
   }
 }
 
-function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath }: {
+async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath }: {
   host: string | undefined,
   httpPort: number,
   enableHttps: boolean,
@@ -168,10 +153,13 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
   // Create a piping server
   const pipingServer = new piping.Server({logger});
 
-  http.createServer(generateHandler({pipingServer, configRef, logger, useHttps: false}))
-    .listen({ host, port: httpPort }, () => {
-      logger.info(`Listen HTTP on ${httpPort}...`);
-    });
+  const httpServedPromise = new Promise<void>(resolve => {
+    http.createServer({ requestTimeout: 0 }, generateHandler({pipingServer, configRef, logger, useHttps: false}))
+      .listen({ host, port: httpPort }, () => {
+        logger.info(`Listen HTTP on ${httpPort}...`);
+        resolve();
+      });
+  });
 
   if (enableHttps) {
     if (httpsPort === undefined) {
@@ -208,10 +196,16 @@ function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCr
     };
     fs.watchFile(serverCrtPath, updateSecureContext);
     fs.watchFile(serverKeyPath, updateSecureContext);
-    http2Server.listen({ host, port: httpsPort }, () => {
-      logger.info(`Listen HTTPS on ${httpsPort}...`);
+
+    await new Promise<void>(resolve => {
+      http2Server.listen({ host, port: httpsPort }, () => {
+        logger.info(`Listen HTTPS on ${httpsPort}...`);
+        resolve();
+      });
     });
   }
+
+  await httpServedPromise;
 
   // Catch and ignore error
   process.on("uncaughtException", (err) => {

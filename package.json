@@ -1,6 +1,6 @@
 {
   "name": "rich-piping-server",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Rich Piping Server",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -28,7 +28,7 @@
     "@types/js-yaml": "^4.0.5",
     "@types/koa-router": "^7.4.4",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^16.18.31",
+    "@types/node": "^18.16.13",
     "@types/node-jose": "^1.1.10",
     "@types/oidc-provider": "^8.2.0",
     "@types/power-assert": "^1.5.8",

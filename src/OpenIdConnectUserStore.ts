@@ -1,44 +1,45 @@
 import * as crypto from "crypto";
 
-type Userinfo = { sub?: string, email?: string }
+type Userinfo = { sub?: string, email?: string, email_verified?: boolean }
 
 export class OpenIdConnectUserStore {
   private ageSeconds: number = 0;
-  private sessionIdToUserInfo: Map<string, Userinfo & { createdAt: Date }> = new Map();
+  private sessionIdToUserInfoWithDate: Map<string, { userinfo: Userinfo, createdAt: Date }> = new Map();
 
   setAgeSeconds(seconds: number) {
     this.ageSeconds = seconds;
   }
 
-  setUserinfo(userInfo: Userinfo): string {
+  setUserinfo(userinfo: Userinfo): string {
     const sessionId = this.generateSessionId();
-    this.sessionIdToUserInfo.set(sessionId, {
-      ...userInfo,
+    this.sessionIdToUserInfoWithDate.set(sessionId, {
+      userinfo,
       createdAt: new Date(),
     });
     const timer = setTimeout(() => {
-      this.sessionIdToUserInfo.delete(sessionId);
+      this.sessionIdToUserInfoWithDate.delete(sessionId);
     }, this.ageSeconds * 1000);
     timer.unref();
     return sessionId;
   }
 
   findValidUserInfo(sessionId: string): Userinfo | undefined {
-    const userInfo = this.sessionIdToUserInfo.get(sessionId);
-    if (userInfo === undefined) {
+    const userinfoWithDate = this.sessionIdToUserInfoWithDate.get(sessionId);
+    if (userinfoWithDate === undefined) {
       return undefined;
     }
-    if (new Date().getTime() <= userInfo.createdAt.getTime() + (this.ageSeconds * 1000)) {
-      return userInfo;
+    const {userinfo, createdAt} = userinfoWithDate;
+    if (new Date().getTime() <= createdAt.getTime() + (this.ageSeconds * 1000)) {
+      return userinfo;
     }
-    this.sessionIdToUserInfo.delete(sessionId);
+    this.sessionIdToUserInfoWithDate.delete(sessionId);
     return undefined;
   }
 
   private generateSessionId(): string {
     while (true) {
       const sessionId = crypto.randomBytes(64).toString("base64url");
-      if (!this.sessionIdToUserInfo.has(sessionId)) {
+      if (!this.sessionIdToUserInfoWithDate.has(sessionId)) {
         return sessionId;
       }
     }

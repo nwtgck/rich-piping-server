@@ -48,7 +48,10 @@ export const configV1Schema = z.object({
     allow_userinfos: z.array(
       z.union([
         z.object({ sub: z.string() }),
-        z.object({ email: z.string() }),
+        z.object({
+          email: z.string(),
+          require_verification: z.optional(z.boolean()),
+        }),
       ]),
     ),
     session: z.object({
@@ -60,8 +63,15 @@ export const configV1Schema = z.object({
         name: z.string(),
         http_only: z.boolean(),
       }),
+      custom_http_header: z.optional(z.string()),
       age_seconds: z.number(),
     }),
+    log: z.optional(z.object({
+      userinfo: z.optional(z.object({
+        sub: z.boolean(),
+        email: z.boolean(),
+      })),
+    })),
   })),
 });
 export type ConfigV1 = z.infer<typeof configV1Schema>;

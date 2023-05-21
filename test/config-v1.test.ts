@@ -233,6 +233,21 @@ rejection: socket_close
       assert.strictEqual(configRef.get()!.basic_auth_users![0].password, ["my", "secret", "pass", "word"].join(""));
     });
 
+    it("should resolve !json_decode tag", async () => {
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+        version: "1"
+        config_for: rich_piping_server
+
+        basic_auth_users:
+          - username: user1
+            password: !json_decode '"mypassword"'
+
+        rejection: socket_close
+      `));
+      assert.strictEqual(configRef.get()!.basic_auth_users![0].password, "mypassword");
+    });
+
     it("should resolve !unrecommended_js tag", async () => {
       // language=yaml
       configRef.set(readConfigV1AndNormalize(`
@@ -302,6 +317,7 @@ openid_connect:
     cookie:
       name: ${sessionCookieName}
       http_only: true
+    custom_http_header: X-My-Session-ID
     age_seconds: 60
 
 rejection: socket_close
@@ -323,9 +339,16 @@ rejection: socket_close
       assert(res3.data.includes(`content="0;/my_first_visit"`));
 
       await shouldTransfer({
-        path: "/mypath",
+        path: "/mypath1",
         headers: {
           "Cookie": `${sessionCookieName}=${cookie.value}`,
+        },
+      });
+
+      await shouldTransfer({
+        path: "/mypath2",
+        headers: {
+          "X-My-Session-ID": cookie.value,
         },
       });
 
@@ -409,6 +432,94 @@ rejection: socket_close
       }
 
       providerServer.close();
+    });
+
+    it("should handle preflight request", async () => {
+      const clientId = "myclientid";
+      const clientSecret = "thisissecret";
+      const issuerPort = await getPort();
+      const issuerUrl = `http://localhost:${issuerPort}`;
+
+      const providerServer = await serveOpenIdProvider({
+        port: issuerPort,
+        clientId,
+        clientSecret,
+        redirectUri: `${pipingUrl}/my_callback`,
+      });
+
+      const sessionCookieName = "my_session_id"
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+version: "1"
+config_for: rich_piping_server
+
+experimental_openid_connect: true
+openid_connect:
+  issuer_url: ${issuerUrl}
+  client_id: ${clientId}
+  client_secret: ${clientSecret}
+  redirect:
+    uri: ${pipingUrl}/my_callback
+    path: /my_callback
+  allow_userinfos:
+    - sub: user001
+  session:
+    cookie:
+      name: ${sessionCookieName}
+      http_only: true
+    custom_http_header: X-My-Session-ID
+    age_seconds: 60
+
+rejection: socket_close
+`));
+      const res = await requestWithoutKeepAlive(`${pipingUrl}/mypath`, {
+        method: "OPTIONS",
+        headers: {
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'x-my-session-id',
+          'access-control-request-private-network': 'true',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'cross-site',
+        },
+      });
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(res.headers["access-control-allow-origin"], "*");
+      assert.strictEqual(res.headers["access-control-allow-methods"], "GET, HEAD, POST, PUT, OPTIONS");
+      assert.strictEqual(res.headers["access-control-allow-headers"], "Content-Type, Content-Disposition, X-Piping, X-My-Session-ID");
+      assert.strictEqual(res.headers["access-control-allow-private-network"], "true");
+
+      providerServer.close();
+    });
+
+    it("should parse log config", async () => {
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+        version: "1"
+        config_for: rich_piping_server
+
+        experimental_openid_connect: true
+        openid_connect:
+          issuer_url: https://dummyissue
+          client_id: myclientid
+          client_secret: thisissecret
+          redirect:
+            uri: https://dummyredirecturi/my_callback
+            path: /my_callback
+          allow_userinfos: [ ]
+          session:
+            cookie:
+              name: dummycookiename
+              http_only: true
+            age_seconds: 60
+          log:
+            userinfo:
+              sub: true
+              email: false
+
+        rejection: socket_close
+      `));
+      assert.strictEqual(configRef.get()?.openid_connect?.log?.userinfo?.sub, true);
+      assert.strictEqual(configRef.get()?.openid_connect?.log?.userinfo?.email, false);
     });
   });
 });

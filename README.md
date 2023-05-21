@@ -64,6 +64,7 @@ Here are some example results of the server with the config.
 These tags are available in config.
 - `!env MY_VALUE1`
 - `!concat [ "hello", !env "MY_VALUE1" ]`
+- `!json_decode "true"`
 - `!unrecommended_js "return new Date().getMonth() < 5"`
 
 Here is an example.
@@ -81,7 +82,7 @@ basic_auth_users:
 
 ### OpenID Connect
 
-This is an experimental feature and it may have breaking changes.
+This is an experimental feature and it may have **breaking changes without config version update**.
 
 ```yaml
 version: '1'
@@ -92,16 +93,18 @@ experimental_openid_connect: true
 
 # optional
 openid_connect:
-  issuer_url: https://example.com
-  client_id: <your client id here>
-  client_secret: <your client secret here>
+  issuer_url: https://example.us.auth0.com
+  client_id: !env "OIDC_CLIENT_ID"
+  client_secret: !env "OIDC_CLIENT_SECRET"
   redirect:
     # Rich Piping Server callback URL
-    uri: https://your_rich_piping_server/callback
+    uri: https://my.rich.piping.server/callback
     path: /callback
   allow_userinfos:
     - sub: auth0|0123456789abcdef01234567
     - email: johnsmith@example.com
+    - email: alice@example.com
+      require_verification: false
   # Session ID is generated after authentication successful and user in "allow_userinfos"
   # Shutting down Rich Piping Server revokes all sessions for now
   session:
@@ -110,15 +113,27 @@ openid_connect:
       http_only: true
     # optional (useful especially for command line tools to get session ID)
     forward:
-      # A CLI may server an ephemeral HTTP server on :65106 and open https://your_rich_piping_server/?my_session_forward_url=http://localhost:65106
+      # A CLI may server an ephemeral HTTP server on :65106 and open https://my.rich.piping.server/?my_session_forward_url=http://localhost:65106
       # The opened browser will POST http://localhost:65106 with `{ "session_id": "..." }` after logged in.
       query_param_name: my_session_forward_url
       allow_url_regexp: ^http://localhost:\d+.*$
+    # optional
+    custom_http_header: X-My-Session-ID
     age_seconds: 86400
+  # optional
+  log:
+    # optional
+    userinfo:
+      sub: false
+      email: false
 
 # Close socket when path not allowed
 rejection: socket_close
 ```
+
+#### What is session forwarding for?
+
+The config has `.openid_connect.session.forward`. It is useful for CLI to get session ID.
 
 <details>
 <summary>Example CLI to get session ID in Node.js</summary>
@@ -127,7 +142,7 @@ rejection: socket_close
 const http = require("http");
 
 (async () => {
-  const richPipingServerUrl = "https://your_rich_piping_server";
+  const richPipingServerUrl = "https://my.rich.piping.server";
   const sessionId = await getSessionId(richPipingServerUrl);
   console.log("sessionId:", sessionId);
   // (you can use session ID now save to ~/.config/... or something)
@@ -210,7 +225,7 @@ The server runs on <http://localhost:8181>.
 ## Config examples
 
 Config examples are found in the tests:  
-<https://github.com/nwtgck/rich-piping-server/blob/38e9f42d79fa13465d7ac1ec9e3eb0ab8bcc0520/test/config-v1.test.ts#L60-L218>
+<https://github.com/nwtgck/rich-piping-server/blob/a2cd491220658561a1509f5a7a8321144c1a3ac7/test/config-v1.test.ts#L42-L459>
 
 ## Migration from legacy config
 
