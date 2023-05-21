@@ -154,7 +154,7 @@ async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, se
   const pipingServer = new piping.Server({logger});
 
   const httpServedPromise = new Promise<void>(resolve => {
-    http.createServer(generateHandler({pipingServer, configRef, logger, useHttps: false}))
+    http.createServer({ requestTimeout: 0 }, generateHandler({pipingServer, configRef, logger, useHttps: false}))
       .listen({ host, port: httpPort }, () => {
         logger.info(`Listen HTTP on ${httpPort}...`);
         resolve();
