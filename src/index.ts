@@ -52,6 +52,10 @@ const parser = yargs
     required: true,
   })
   .alias("config-path", "config-yaml-path")
+  .epilogue(`\
+Example configs are found in
+https://github.com/nwtgck/rich-piping-server#readme
+`)
   .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
     migrateConfigCommand(argv.configPath);
