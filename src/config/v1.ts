@@ -63,6 +63,7 @@ export const configV1Schema = z.object({
         name: z.string(),
         http_only: z.boolean(),
       }),
+      custom_http_header: z.optional(z.string()),
       age_seconds: z.number(),
     }),
     log: z.optional(z.object({

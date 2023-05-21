@@ -117,6 +117,8 @@ openid_connect:
       # The opened browser will POST http://localhost:65106 with `{ "session_id": "..." }` after logged in.
       query_param_name: my_session_forward_url
       allow_url_regexp: ^http://localhost:\d+.*$
+    # optional
+    custom_http_header: X-My-Session-ID
     age_seconds: 86400
   # optional
   log:

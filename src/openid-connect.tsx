@@ -8,6 +8,7 @@ import * as openidClient from "openid-client";
 import { h } from 'preact';
 import {renderToString} from "preact-render-to-string";
 import {z} from "zod";
+import {httpFirstHeaderValue} from "./utils";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
@@ -31,16 +32,19 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   req: HttpReq,
   res: HttpRes,
 }): Promise<"authorized" | "responded"> {
-  logger?.info(`OpenID Connect: ${req.method} ${req.url} ${req.httpVersion}`);
+  logger?.info(`OpenID Connect: ${req.method} ${req.url} HTTP/${req.httpVersion}`);
   // Always set because config may be hot reloaded
   openIdConnectUserStore.setAgeSeconds(oidcConfig.session.age_seconds);
   const url = new URL(req.url!, `http://${req.headers.host}`);
+  if (req.method === "OPTIONS" && oidcConfig.session.custom_http_header !== undefined && req.headers["access-control-request-headers"]?.toLowerCase().includes(oidcConfig.session.custom_http_header.toLowerCase()) === true) {
+    handlePreflightRequest(oidcConfig.session.custom_http_header, req, res);
+    return "responded";
+  }
   if (url.pathname === oidcConfig.redirect.path) {
     await handleRedirect(logger, client, codeVerifier, openIdConnectUserStore, oidcConfig, req, res);
     return "responded";
   }
-  const parsedCookie = cookie.parse(req.headers.cookie ?? "");
-  const sessionId: string | undefined = parsedCookie[oidcConfig.session.cookie.name];
+  const sessionId: string | undefined = getSessionId(oidcConfig, req);
   if (sessionId === undefined) {
     startAuthorization(client, codeChallenge, oidcConfig, req, res);
     return "responded";
@@ -57,9 +61,9 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
     return "responded";
   }
   if (oidcConfig.session.forward !== undefined) {
-    logger?.info(`session forwarding: userinfo=${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
     const sessionForwardUrl: string | null = url.searchParams.get(oidcConfig.session.forward.query_param_name);
     if (sessionForwardUrl !== null) {
+      logger?.info(`session forwarding: userinfo=${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
       respondForwardHtml({
         // Already Cookie is set
         setCookieValue: undefined,
@@ -71,8 +75,38 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
       return "responded";
     }
   }
-  logger?.info(`OpenID Connect authorized: userinfo=${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
+  logger?.info(`OpenID Connect authorized: ${req.method} ${req.url} HTTP/${req.httpVersion} userinfo=${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
   return "authorized";
+}
+
+function handlePreflightRequest(sessionCustomHeader: string, req: HttpReq, res: HttpRes) {
+  res.writeHead(200, {
+    "Access-Control-Allow-Origin": '*',
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, OPTIONS",
+    "Access-Control-Allow-Headers": `Content-Type, Content-Disposition, X-Piping, ${sessionCustomHeader}`,
+    // Private Network Access preflights: https://developer.chrome.com/blog/private-network-access-preflight/
+    ...(req.headers["access-control-request-private-network"] === "true" ? {
+      "Access-Control-Allow-Private-Network": "true",
+    }: {}),
+    // Expose "Access-Control-Allow-Headers" for Web browser detecting X-Piping feature
+    "Access-Control-Expose-Headers": "Access-Control-Allow-Headers",
+    "Access-Control-Max-Age": 86400,
+    "Content-Length": 0
+  });
+  res.end();
+  return;
+}
+
+function getSessionId(oidcConfig: OidcConfig, req: HttpReq): string | undefined {
+  const parsedCookie = cookie.parse(req.headers.cookie ?? "");
+  const cookieSessionId = parsedCookie[oidcConfig.session.cookie.name];
+  if (cookieSessionId !== undefined) {
+    return cookieSessionId;
+  }
+  if (oidcConfig.session.custom_http_header !== undefined) {
+    return httpFirstHeaderValue(req.headers, oidcConfig.session.custom_http_header.toLowerCase());
+  }
+  return undefined;
 }
 
 type Userinfo = { sub?: string, email?: string, email_verified?: boolean };
