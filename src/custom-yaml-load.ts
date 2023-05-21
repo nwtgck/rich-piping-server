@@ -24,7 +24,17 @@ const envYamlType = new yaml.Type('!env', {
   },
 });
 
-const jsYamlType = new yaml.Type('!unrecommended_js', {
+const jsonDecodeYamlType = new yaml.Type('!json_decode', {
+  kind: 'scalar',
+  resolve(data) {
+    return typeof data === "string";
+  },
+  construct(data) {
+    return JSON.parse(data);
+  },
+});
+
+const unrecommendedJsYamlType = new yaml.Type('!unrecommended_js', {
   kind: 'scalar',
   resolve(data) {
     return typeof data === "string";
@@ -37,5 +47,6 @@ const jsYamlType = new yaml.Type('!unrecommended_js', {
 const customYamlSchema = yaml.DEFAULT_SCHEMA.extend([
   concatYamlType,
   envYamlType,
-  jsYamlType,
+  jsonDecodeYamlType,
+  unrecommendedJsYamlType,
 ]);

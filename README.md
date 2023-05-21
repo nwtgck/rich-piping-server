@@ -64,6 +64,7 @@ Here are some example results of the server with the config.
 These tags are available in config.
 - `!env MY_VALUE1`
 - `!concat [ "hello", !env "MY_VALUE1" ]`
+- `!json_decode "true"`
 - `!unrecommended_js "return new Date().getMonth() < 5"`
 
 Here is an example.

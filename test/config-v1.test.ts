@@ -233,6 +233,21 @@ rejection: socket_close
       assert.strictEqual(configRef.get()!.basic_auth_users![0].password, ["my", "secret", "pass", "word"].join(""));
     });
 
+    it("should resolve !json_decode tag", async () => {
+      // language=yaml
+      configRef.set(readConfigV1AndNormalize(`
+        version: "1"
+        config_for: rich_piping_server
+
+        basic_auth_users:
+          - username: user1
+            password: !json_decode '"mypassword"'
+
+        rejection: socket_close
+      `));
+      assert.strictEqual(configRef.get()!.basic_auth_users![0].password, "mypassword");
+    });
+
     it("should resolve !unrecommended_js tag", async () => {
       // language=yaml
       configRef.set(readConfigV1AndNormalize(`
