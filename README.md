@@ -82,7 +82,7 @@ basic_auth_users:
 
 ### OpenID Connect
 
-This is an experimental feature and it may have breaking changes.
+This is an experimental feature and it may have **breaking changes without config version update**.
 
 ```yaml
 version: '1'
@@ -93,12 +93,12 @@ experimental_openid_connect: true
 
 # optional
 openid_connect:
-  issuer_url: https://example.com
-  client_id: <your client id here>
-  client_secret: <your client secret here>
+  issuer_url: https://example.us.auth0.com
+  client_id: !env "OIDC_CLIENT_ID"
+  client_secret: !env "OIDC_CLIENT_SECRET"
   redirect:
     # Rich Piping Server callback URL
-    uri: https://your_rich_piping_server/callback
+    uri: https://my.rich.piping.server/callback
     path: /callback
   allow_userinfos:
     - sub: auth0|0123456789abcdef01234567
@@ -113,7 +113,7 @@ openid_connect:
       http_only: true
     # optional (useful especially for command line tools to get session ID)
     forward:
-      # A CLI may server an ephemeral HTTP server on :65106 and open https://your_rich_piping_server/?my_session_forward_url=http://localhost:65106
+      # A CLI may server an ephemeral HTTP server on :65106 and open https://my.rich.piping.server/?my_session_forward_url=http://localhost:65106
       # The opened browser will POST http://localhost:65106 with `{ "session_id": "..." }` after logged in.
       query_param_name: my_session_forward_url
       allow_url_regexp: ^http://localhost:\d+.*$
@@ -129,6 +129,10 @@ openid_connect:
 rejection: socket_close
 ```
 
+#### What is session forwarding for?
+
+The config has `.openid_connect.session.forward`. It is useful for CLI to get session ID.
+
 <details>
 <summary>Example CLI to get session ID in Node.js</summary>
 
@@ -136,7 +140,7 @@ rejection: socket_close
 const http = require("http");
 
 (async () => {
-  const richPipingServerUrl = "https://your_rich_piping_server";
+  const richPipingServerUrl = "https://my.rich.piping.server";
   const sessionId = await getSessionId(richPipingServerUrl);
   console.log("sessionId:", sessionId);
   // (you can use session ID now save to ~/.config/... or something)
