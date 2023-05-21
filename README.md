@@ -219,7 +219,7 @@ The server runs on <http://localhost:8181>.
 ## Config examples
 
 Config examples are found in the tests:  
-<https://github.com/nwtgck/rich-piping-server/blob/38e9f42d79fa13465d7ac1ec9e3eb0ab8bcc0520/test/config-v1.test.ts#L60-L218>
+<https://github.com/nwtgck/rich-piping-server/blob/a2cd491220658561a1509f5a7a8321144c1a3ac7/test/config-v1.test.ts#L42-L459>
 
 ## Migration from legacy config
 
