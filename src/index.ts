@@ -56,6 +56,11 @@ const parser = yargs
 Example configs are found in
 https://github.com/nwtgck/rich-piping-server#readme
 `)
+  .option("debug-config", {
+    describe: "Print normalized config as JSON (all env! and other tangs are evaluated)",
+    boolean: true,
+    default: false
+  })
   .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
     migrateConfigCommand(argv.configPath);
@@ -78,6 +83,7 @@ if (args._.length === 0) {
     serverKeyPath:  args["key-path"],
     serverCrtPath: args["crt-path"],
     configYamlPath:  args["config-yaml-path"],
+    printConfigJson: args["debug-config"],
   });
 }
 
@@ -98,7 +104,7 @@ function logZodError<T>(zodError: z.ZodError<T>) {
   }
 }
 
-function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): void {
+function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string, printConfigJson: boolean): void {
   // Load config
   logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
   try {
@@ -128,12 +134,15 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string): voi
       configRef.set(normalizeConfigV1(logger, configParsed.data));
     }
     logger.info(`${JSON.stringify(configYamlPath)} is loaded successfully`);
+    if (printConfigJson) {
+      console.log(`Normalized config:\n${JSON.stringify(configRef.get(), null, 2)}`);
+    }
   } catch (err) {
     logger.error("Failed to load config", err);
   }
 }
 
-async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath }: {
+async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath, printConfigJson }: {
   host: string | undefined,
   httpPort: number,
   enableHttps: boolean,
@@ -141,13 +150,14 @@ async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, se
   serverKeyPath: string | undefined,
   serverCrtPath: string | undefined,
   configYamlPath: string,
+  printConfigJson: boolean,
 }) {
   // Load config
-  loadAndUpdateConfig(logger, configYamlPath);
+  loadAndUpdateConfig(logger, configYamlPath, printConfigJson);
 
   // Watch config yaml
   fs.watch(configYamlPath, () => {
-    loadAndUpdateConfig(logger, configYamlPath);
+    loadAndUpdateConfig(logger, configYamlPath, printConfigJson);
   });
 
   // Create a piping server
