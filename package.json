@@ -58,7 +58,7 @@
     "openid-client": "^5.4.2",
     "piping-server": "^1.12.9",
     "preact": "^10.15.1",
-    "preact-render-to-string": "^6.0.3",
+    "preact-render-to-string": "^6.1.0",
     "useragent": "^2.3.0",
     "yargs": "^17.7.2",
     "zod": "^3.21.4"
