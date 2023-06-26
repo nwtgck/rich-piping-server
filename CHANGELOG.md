@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+## [0.5.0] - 2023-06-26
+### Added
+* Add --debug-config option
+
+### Fixed
+* Support preflight request for basic authentication
+
 ## [0.4.0] - 2023-05-21
 ### Changed
 * Require email verification by default and add "require_verification" config
@@ -58,7 +65,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 * Support TLS certificate hot reload
 * Add "migrate-config" subcommand
 
-[Unreleased]: https://github.com/nwtgck/rich-piping-server/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/nwtgck/rich-piping-server/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/nwtgck/rich-piping-server/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/nwtgck/rich-piping-server/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/nwtgck/rich-piping-server/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/nwtgck/rich-piping-server/compare/v0.2.2...v0.3.0
