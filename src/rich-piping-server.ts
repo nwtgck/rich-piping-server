@@ -10,6 +10,7 @@ import * as openidClient from "openid-client";
 import {ConfigRef} from "./ConfigRef";
 import {OpenIdConnectUserStore} from "./OpenIdConnectUserStore";
 import {handleOpenIdConnect} from "./openid-connect";
+import {handlePreflightRequest} from "./handlePreflightRequest";
 
 type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
 type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
@@ -34,8 +35,14 @@ export function generateHandler({pipingServer, configRef, logger, useHttps}: {pi
       return;
     }
     // Basic auth is enabled and denied
-    if (config.basic_auth_users !== undefined && handleBasicAuth(config.basic_auth_users, req, res) === "denied") {
-      return
+    if (config.basic_auth_users !== undefined) {
+      if (req.method === "OPTIONS") {
+        handlePreflightRequest(["Authorization"], req, res);
+        return;
+      }
+      if (handleBasicAuth(config.basic_auth_users, req, res) === "denied") {
+        return;
+      }
     }
     if (config.openid_connect !== undefined) {
       const result: "authorized" | "responded" = await handleOpenIdConnect({
