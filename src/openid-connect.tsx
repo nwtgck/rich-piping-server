@@ -9,9 +9,8 @@ import { h } from 'preact';
 import {renderToString} from "preact-render-to-string";
 import {z} from "zod";
 import {httpFirstHeaderValue} from "./utils";
-
-type HttpReq = http.IncomingMessage | http2.Http2ServerRequest;
-type HttpRes = http.ServerResponse | http2.Http2ServerResponse;
+import {HttpReq, HttpRes} from "./HttpReqRes";
+import {handlePreflightRequest} from "./handlePreflightRequest";
 
 const oidcStateScheme = z.object({
   return_to: z.string(),
@@ -37,7 +36,7 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   openIdConnectUserStore.setAgeSeconds(oidcConfig.session.age_seconds);
   const url = new URL(req.url!, `http://${req.headers.host}`);
   if (req.method === "OPTIONS" && oidcConfig.session.custom_http_header !== undefined && req.headers["access-control-request-headers"]?.toLowerCase().includes(oidcConfig.session.custom_http_header.toLowerCase()) === true) {
-    handlePreflightRequest(oidcConfig.session.custom_http_header, req, res);
+    handlePreflightRequest([oidcConfig.session.custom_http_header], req, res);
     return "responded";
   }
   if (url.pathname === oidcConfig.redirect.path) {
@@ -77,24 +76,6 @@ export async function handleOpenIdConnect({logger, openIdConnectUserStore, codeV
   }
   logger?.info(`OpenID Connect authorized: ${req.method} ${req.url} HTTP/${req.httpVersion} userinfo=${userinfoForLog(oidcConfig.log?.userinfo, userinfo)}`);
   return "authorized";
-}
-
-function handlePreflightRequest(sessionCustomHeader: string, req: HttpReq, res: HttpRes) {
-  res.writeHead(200, {
-    "Access-Control-Allow-Origin": '*',
-    "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": `Content-Type, Content-Disposition, X-Piping, ${sessionCustomHeader}`,
-    // Private Network Access preflights: https://developer.chrome.com/blog/private-network-access-preflight/
-    ...(req.headers["access-control-request-private-network"] === "true" ? {
-      "Access-Control-Allow-Private-Network": "true",
-    }: {}),
-    // Expose "Access-Control-Allow-Headers" for Web browser detecting X-Piping feature
-    "Access-Control-Expose-Headers": "Access-Control-Allow-Headers",
-    "Access-Control-Max-Age": 86400,
-    "Content-Length": 0
-  });
-  res.end();
-  return;
 }
 
 function getSessionId(oidcConfig: OidcConfig, req: HttpReq): string | undefined {

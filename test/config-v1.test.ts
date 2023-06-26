@@ -197,6 +197,24 @@ rejection: socket_close
         "Authorization": `Basic ${Buffer.from("user1:pass1234").toString("base64")}`,
       },
     });
+    // preflight request
+    {
+      const res = await requestWithoutKeepAlive(`${pipingUrl}/myallowedpath1`, {
+        method: "OPTIONS",
+        headers: {
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'authorization',
+          'access-control-request-private-network': 'true',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'cross-site',
+        },
+      });
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(res.headers["access-control-allow-origin"], "*");
+      assert.strictEqual(res.headers["access-control-allow-methods"], "GET, HEAD, POST, PUT, OPTIONS");
+      assert.strictEqual(res.headers["access-control-allow-headers"], "Content-Type, Content-Disposition, X-Piping, Authorization");
+      assert.strictEqual(res.headers["access-control-allow-private-network"], "true");
+    }
   });
 
   context("custom tag", () => {
