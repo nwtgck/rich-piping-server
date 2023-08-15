@@ -61,6 +61,6 @@
     "preact-render-to-string": "^6.2.1",
     "useragent": "^2.3.0",
     "yargs": "^17.7.2",
-    "zod": "^3.21.4"
+    "zod": "^3.22.0"
   }
 }
