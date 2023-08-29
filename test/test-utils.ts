@@ -116,12 +116,12 @@ export function createTransferAssertions({getPipingUrl}: { getPipingUrl: () => s
 }
 
 export function readConfigWithoutVersionAndMigrateToV1AndNormalize(yamlString: string): NormalizedConfig {
-  const configYaml = customYamlLoad(yamlString);
+  const configYaml = customYamlLoad({extraEnv: {}, yamlString});
   const configWithoutVersion = configWihtoutVersionSchema.parse(configYaml);
   return normalizeConfigV1(undefined, migrateToConfigV1(configWithoutVersion));
 }
 
 export function readConfigV1AndNormalize(yamlString: string): NormalizedConfig {
-  const configYaml = customYamlLoad(yamlString);
+  const configYaml = customYamlLoad({extraEnv: {}, yamlString});
   return normalizeConfigV1(undefined, configV1Schema.parse(configYaml));
 }

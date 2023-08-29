@@ -9,6 +9,7 @@ import * as log4js from "log4js";
 import * as yargs from "yargs";
 import { z } from "zod";
 import * as piping from "piping-server";
+import * as dotenv from "dotenv";
 
 import {generateHandler} from "./rich-piping-server";
 import {configWihtoutVersionSchema} from "./config/without-version";
@@ -46,6 +47,10 @@ const parser = yargs
     describe: "Certification path",
     type: "string"
   })
+  .option('env-path', {
+    describe: ".env file path",
+    type: "string",
+  })
   .option('config-path', {
     describe: "Config YAML path",
     type: "string",
@@ -63,7 +68,7 @@ https://github.com/nwtgck/rich-piping-server#readme
   })
   .command("migrate-config", "Print migrated config", (yargs) => {
   }, (argv) => {
-    migrateConfigCommand(argv.configPath);
+    migrateConfigCommand(argv.envPath, argv.configPath);
   });
 
 
@@ -82,6 +87,7 @@ if (args._.length === 0) {
     httpsPort: args["https-port"],
     serverKeyPath:  args["key-path"],
     serverCrtPath: args["crt-path"],
+    envFilePath: args["env-path"],
     configYamlPath:  args["config-yaml-path"],
     printConfigJson: args["debug-config"],
   });
@@ -104,11 +110,12 @@ function logZodError<T>(zodError: z.ZodError<T>) {
   }
 }
 
-function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string, printConfigJson: boolean): void {
+function loadAndUpdateConfig(logger: log4js.Logger, envFilePath: string | undefined, configYamlPath: string, printConfigJson: boolean): void {
   // Load config
-  logger.info(`Loading ${JSON.stringify(configYamlPath)}...`);
+  logger.info(`Loading ${ envFilePath === undefined ? "" : `${JSON.stringify(envFilePath)} and ` }${JSON.stringify(configYamlPath)}...`);
   try {
-    const configYaml = customYamlLoad(fs.readFileSync(configYamlPath, 'utf8'));
+    const extraEnv = envFilePath == undefined ? {} : dotenv.parse(fs.readFileSync(envFilePath));
+    const configYaml = customYamlLoad({ extraEnv, yamlString: fs.readFileSync(configYamlPath, 'utf8') });
     // NOTE: using configBasicSchema makes error message better
     const configBasicParsed = configBasicSchema.safeParse(configYaml);
     if (!configBasicParsed.success) {
@@ -142,22 +149,29 @@ function loadAndUpdateConfig(logger: log4js.Logger, configYamlPath: string, prin
   }
 }
 
-async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, configYamlPath, printConfigJson }: {
+async function serve({ host, httpPort, enableHttps, httpsPort, serverKeyPath, serverCrtPath, envFilePath, configYamlPath, printConfigJson }: {
   host: string | undefined,
   httpPort: number,
   enableHttps: boolean,
   httpsPort: number | undefined,
   serverKeyPath: string | undefined,
+  envFilePath: string | undefined,
   serverCrtPath: string | undefined,
   configYamlPath: string,
   printConfigJson: boolean,
 }) {
   // Load config
-  loadAndUpdateConfig(logger, configYamlPath, printConfigJson);
+  loadAndUpdateConfig(logger, envFilePath, configYamlPath, printConfigJson);
 
+  // Watch env file
+  if (envFilePath !== undefined) {
+    fs.watch(envFilePath, () => {
+      loadAndUpdateConfig(logger, envFilePath, configYamlPath, printConfigJson);
+    });
+  }
   // Watch config yaml
   fs.watch(configYamlPath, () => {
-    loadAndUpdateConfig(logger, configYamlPath, printConfigJson);
+    loadAndUpdateConfig(logger, envFilePath, configYamlPath, printConfigJson);
   });
 
   // Create a piping server

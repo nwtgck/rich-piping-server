@@ -3,9 +3,11 @@ import * as fs from "fs";
 import {configV1Schema, migrateToConfigV1} from "../config/v1";
 import {configWihtoutVersionSchema} from "../config/without-version";
 import * as yaml from "js-yaml";
+import * as dotenv from "dotenv";
 
-export function migrateConfigCommand(configPath: string) {
-  const configYaml = customYamlLoad(fs.readFileSync(configPath, 'utf8'));
+export function migrateConfigCommand(envFilePath: string | undefined, configPath: string) {
+  const extraEnv = envFilePath == undefined ? {} : dotenv.parse(fs.readFileSync(envFilePath));
+  const configYaml = customYamlLoad({ extraEnv, yamlString: fs.readFileSync(configPath, 'utf8') });
   if (configV1Schema.safeParse(configYaml).success) {
     console.log("The config is already a valid config v1");
     return;
