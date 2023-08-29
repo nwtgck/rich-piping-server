@@ -254,7 +254,14 @@ Options:
   --https-port                       Port of HTTPS server               [number]
   --key-path                         Private key path                   [string]
   --crt-path                         Certification path                 [string]
+  --env-path                         .env file path                     [string]
   --config-path, --config-yaml-path  Config YAML path        [string] [required]
+  --debug-config                     Print normalized config as JSON (all env!
+                                     and other tangs are evaluated)
+                                                      [boolean] [default: false]
+
+Example configs are found in
+https://github.com/nwtgck/rich-piping-server#readme
 ```
 
 ## Relation to Piping Server

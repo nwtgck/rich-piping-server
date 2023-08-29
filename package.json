@@ -1,6 +1,6 @@
 {
   "name": "rich-piping-server",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Rich Piping Server",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -35,32 +35,33 @@
     "@types/tough-cookie": "^4.0.2",
     "@types/useragent": "^2.3.1",
     "@types/yargs": "^17.0.24",
-    "axios": "^1.4.0",
+    "axios": "^1.5.0",
     "axios-cookiejar-support": "^4.0.7",
     "get-port": "^5.1.1",
     "koa-body": "^6.0.1",
     "koa-router": "^12.0.0",
     "mocha": "^10.2.0",
     "node-jose": "^2.2.0",
-    "oidc-provider": "^8.2.2",
+    "oidc-provider": "^8.3.0",
     "pkg": "^5.8.1",
     "power-assert": "^1.6.1",
     "tough-cookie": "^4.1.3",
     "ts-node": "^10.9.1",
-    "typescript": "^5.1.3",
-    "undici": "^5.22.1"
+    "typescript": "^5.2.2",
+    "undici": "^5.23.0"
   },
   "dependencies": {
     "basic-auth": "^2.0.1",
     "cookie": "^0.5.0",
+    "dotenv": "^16.3.1",
     "js-yaml": "^4.1.0",
     "log4js": "^6.9.1",
-    "openid-client": "^5.4.2",
+    "openid-client": "^5.4.3",
     "piping-server": "^1.12.9",
-    "preact": "^10.15.1",
-    "preact-render-to-string": "^6.1.0",
+    "preact": "^10.17.1",
+    "preact-render-to-string": "^6.2.1",
     "useragent": "^2.3.0",
     "yargs": "^17.7.2",
-    "zod": "^3.21.4"
+    "zod": "^3.22.2"
   }
 }
