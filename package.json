@@ -1,6 +1,6 @@
 {
   "name": "rich-piping-server",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Rich Piping Server",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
