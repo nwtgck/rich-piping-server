@@ -58,7 +58,7 @@ jobs:
         with:
           submodules: true
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - run: |
           set -xeu
           docker run --rm -i -v $PWD:/app --platform=linux/arm64/v8 node:20 bash << 'EOF'
