@@ -225,7 +225,7 @@ jobs:
           kill $server_pid
 
   windows_operational_test:
-    runs-on: windows-2019
+    runs-on: windows-2022
     needs: build_x64_executables
     steps:
       - uses: actions/download-artifact@v3
