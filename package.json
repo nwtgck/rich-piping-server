@@ -24,7 +24,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/basic-auth": "^1.1.4",
-    "@types/cookie": "^0.5.2",
+    "@types/cookie": "^0.5.3",
     "@types/js-yaml": "^4.0.8",
     "@types/koa-router": "^7.4.6",
     "@types/mocha": "^10.0.2",
