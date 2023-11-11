@@ -33,7 +33,7 @@
     "@types/oidc-provider": "^8.4.1",
     "@types/power-assert": "^1.5.10",
     "@types/tough-cookie": "^4.0.4",
-    "@types/useragent": "^2.3.3",
+    "@types/useragent": "^2.3.4",
     "@types/yargs": "^17.0.29",
     "axios": "^1.6.1",
     "axios-cookiejar-support": "^4.0.7",
