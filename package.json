@@ -30,7 +30,7 @@
     "@types/mocha": "^10.0.4",
     "@types/node": "^18.16.13",
     "@types/node-jose": "^1.1.12",
-    "@types/oidc-provider": "^8.4.1",
+    "@types/oidc-provider": "^8.4.2",
     "@types/power-assert": "^1.5.11",
     "@types/tough-cookie": "^4.0.5",
     "@types/useragent": "^2.3.4",
