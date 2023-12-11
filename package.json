@@ -34,7 +34,7 @@
     "@types/power-assert": "^1.5.12",
     "@types/tough-cookie": "^4.0.5",
     "@types/useragent": "^2.3.4",
-    "@types/yargs": "^17.0.31",
+    "@types/yargs": "^17.0.32",
     "axios": "^1.6.2",
     "axios-cookiejar-support": "^4.0.7",
     "get-port": "^5.1.1",
