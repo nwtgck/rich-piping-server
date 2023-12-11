@@ -24,7 +24,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/basic-auth": "^1.1.6",
-    "@types/cookie": "^0.5.3",
+    "@types/cookie": "^0.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/koa-router": "^7.4.8",
     "@types/mocha": "^10.0.6",
@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "basic-auth": "^2.0.1",
-    "cookie": "^0.5.0",
+    "cookie": "^0.6.0",
     "dotenv": "^16.3.1",
     "js-yaml": "^4.1.0",
     "log4js": "^6.9.1",
