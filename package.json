@@ -23,7 +23,7 @@
   "author": "Ryo Ota <nwtgck@nwtgck.org> (https://github.com/nwtgck)",
   "license": "MIT",
   "devDependencies": {
-    "@types/basic-auth": "^1.1.7",
+    "@types/basic-auth": "^1.1.8",
     "@types/cookie": "^0.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/koa-router": "^7.4.8",
