@@ -37,7 +37,7 @@
     "@types/yargs": "^17.0.32",
     "axios": "^1.6.8",
     "axios-cookiejar-support": "^5.0.1",
-    "get-port": "^5.1.1",
+    "get-port": "^7.1.0",
     "koa-body": "^6.0.1",
     "koa-router": "^12.0.1",
     "mocha": "^10.4.0",
