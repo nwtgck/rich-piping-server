@@ -48,7 +48,7 @@
     "tough-cookie": "^4.1.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
-    "undici": "^5.28.2"
+    "undici": "^6.18.1"
   },
   "dependencies": {
     "basic-auth": "^2.0.1",
