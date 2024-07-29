@@ -28,7 +28,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/koa-router": "^7.4.8",
     "@types/mocha": "^10.0.7",
-    "@types/node": "^18.16.13",
+    "@types/node": "^22.0.0",
     "@types/node-jose": "^1.1.13",
     "@types/oidc-provider": "^8.4.4",
     "@types/power-assert": "^1.5.12",
