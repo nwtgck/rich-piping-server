@@ -35,7 +35,7 @@
     "@types/tough-cookie": "^4.0.5",
     "@types/useragent": "^2.3.4",
     "@types/yargs": "^17.0.32",
-    "axios": "^1.7.3",
+    "axios": "^1.7.5",
     "axios-cookiejar-support": "^5.0.2",
     "get-port": "^5.1.1",
     "koa-body": "^6.0.1",
