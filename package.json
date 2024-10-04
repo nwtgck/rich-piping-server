@@ -58,7 +58,7 @@
     "log4js": "^6.9.1",
     "openid-client": "^5.7.0",
     "piping-server": "^1.12.9",
-    "preact": "^10.24.1",
+    "preact": "^10.24.2",
     "preact-render-to-string": "^6.5.11",
     "useragent": "^2.3.0",
     "yargs": "^17.7.2",
