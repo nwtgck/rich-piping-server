@@ -45,7 +45,7 @@
     "oidc-provider": "^8.5.1",
     "pkg": "^5.8.1",
     "power-assert": "^1.6.1",
-    "tough-cookie": "^4.1.4",
+    "tough-cookie": "^5.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4",
     "undici": "^5.28.2"
