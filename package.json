@@ -40,7 +40,7 @@
     "get-port": "^5.1.1",
     "koa-body": "^6.0.1",
     "koa-router": "^13.0.1",
-    "mocha": "^10.8.2",
+    "mocha": "^11.0.1",
     "node-jose": "^2.2.0",
     "oidc-provider": "^8.6.0",
     "pkg": "^5.8.1",
