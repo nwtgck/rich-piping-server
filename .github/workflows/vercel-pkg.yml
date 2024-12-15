@@ -206,7 +206,7 @@ jobs:
           # Get server PID
           server_pid=$!
           # Wait for server running
-          sleep 1
+          sleep 3
           # Create a file to send
           echo 'hello, world' > /tmp/hello.txt
           # Send and wait for a receiver
