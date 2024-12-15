@@ -179,7 +179,7 @@ jobs:
           EOF
 
   macos_operational_test:
-    runs-on: macos-12
+    runs-on: macos-14
     needs: build_x64_executables
     steps:
       - uses: actions/download-artifact@v3
