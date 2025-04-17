@@ -42,7 +42,7 @@
     "koa-router": "^13.0.1",
     "mocha": "^10.8.2",
     "node-jose": "^2.2.0",
-    "oidc-provider": "^8.6.1",
+    "oidc-provider": "^9.0.1",
     "pkg": "^5.8.1",
     "power-assert": "^1.6.1",
     "tough-cookie": "^4.1.4",
